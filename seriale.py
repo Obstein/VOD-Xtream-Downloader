@@ -5,6 +5,8 @@ import subprocess
 from urllib.parse import quote
 import json
 import sys
+import threading
+import queue
 
 seriale_bp = Blueprint('seriale', __name__)
 
@@ -16,6 +18,28 @@ DOWNLOAD_PATH_SERIES = os.getenv("DOWNLOAD_PATH_SERIES", "/downloads/Seriale")
 RETRY_COUNT = int(os.getenv("RETRY_COUNT", 3))
 
 BASE_API = f"{XTREAM_HOST}:{XTREAM_PORT}/player_api.php?username={XTREAM_USERNAME}&password={XTREAM_PASSWORD}"
+
+# Kolejka i wątek do pobierania
+download_queue = queue.Queue()
+download_log = []
+
+
+def download_worker():
+    while True:
+        job = download_queue.get()
+        if job is None:
+            break
+        try:
+            subprocess.run(job["cmd"], check=True)
+            status = "✅ Ukończono"
+        except subprocess.CalledProcessError:
+            status = "❌ Błąd"
+        download_log.append({"file": job["file"], "status": status})
+        download_queue.task_done()
+
+
+threading.Thread(target=download_worker, daemon=True).start()
+
 
 @seriale_bp.route("/seriale")
 def seriale_list():
@@ -32,6 +56,7 @@ def seriale_list():
     {% endfor %}
     """
     return render_template_string(html, seriale=seriale)
+
 
 @seriale_bp.route("/seriale/<int:series_id>")
 def serial_detail(series_id):
@@ -88,12 +113,25 @@ def serial_detail(series_id):
         {% endfor %}
         </ul>
     {% endfor %}
+    <hr>
+    <h3>Kolejka</h3>
+    <ul>
+    {% for item in queue %}
+        <li>⏳ {{ item }}</li>
+    {% endfor %}
+    </ul>
+    <h3>Historia</h3>
+    <ul>
+    {% for item in log %}
+        <li>{{ item.status }} {{ item.file }}</li>
+    {% endfor %}
+    </ul>
     """
-    return render_template_string(html, serial=serial, sezony=sezony, series_id=series_id)
+    return render_template_string(html, serial=serial, sezony=sezony, series_id=series_id, queue=list(download_queue.queue), log=download_log[-20:])
+
 
 @seriale_bp.route("/download/episode", methods=["POST"])
 def download_episode():
-    sys.stderr.write("🟢 URUCHOMIONO download_episode()\n")
     data = request.form
     series_id = data['series_id'].strip()
     episode_id = data['id']
@@ -102,19 +140,10 @@ def download_episode():
     episode_num = data.get('episode_num', '1')
 
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
-    sys.stderr.write(f"🔍 EPISODE API RESPONSE: {response.status_code} {response.text}\n")
-
     if response.status_code != 200:
         return "Błąd pobierania metadanych", 500
 
-    try:
-        data = response.json()
-        if 'info' not in data:
-            return "Błąd: brak pola 'info' w odpowiedzi API", 500
-        info = data['info']
-    except Exception as e:
-        return f"Błąd dekodowania odpowiedzi API: {e}", 500
-
+    data = response.json()
     episodes_raw = data.get("episodes", {})
     if isinstance(episodes_raw, str):
         episodes_raw = json.loads(episodes_raw)
@@ -138,7 +167,7 @@ def download_episode():
     if codec == "png" and attached == 1:
         return "❌ To nie jest plik wideo, tylko miniatura (cover)", 400
 
-    serial_name = info.get('name', f"serial_{series_id}").replace('/', '_')
+    serial_name = data.get('info', {}).get('name', f"serial_{series_id}").replace('/', '_')
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
     os.makedirs(path, exist_ok=True)
 
@@ -148,40 +177,23 @@ def download_episode():
 
     url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
 
-    success = False
-    for _ in range(RETRY_COUNT):
-        try:
-            subprocess.run(["wget", "-O", file_path, url], check=True)
-            success = True
-            break
-        except subprocess.CalledProcessError:
-            continue
+    job = {"cmd": ["wget", "-O", file_path, url], "file": file_name}
+    download_queue.put(job)
+    return "🕐 Dodano do kolejki", 202
 
-    return ("Pobrano" if success else "Błąd przy pobieraniu"), 200 if success else 500
 
 @seriale_bp.route("/download/season", methods=["POST"])
 def download_season():
-    sys.stderr.write("🟢 URUCHOMIONO download_season()\n")
     series_id = request.form['series_id'].strip()
     season = int(request.form['season'])
 
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
-    sys.stderr.write(f"🔍 SEASON API RESPONSE: {response.status_code} {response.text}\n")
-
     if response.status_code != 200:
         return "Błąd pobierania danych serialu", 500
 
-    try:
-        data = response.json()
-        if 'info' not in data or 'episodes' not in data:
-            return "Błąd: niekompletna odpowiedź z API", 500
-        info = data
-    except Exception as e:
-        return f"Błąd dekodowania JSON: {e}", 500
-
-    serial_name = info['info']['name'].replace('/', '_')
-
-    episodes_raw = info['episodes']
+    data = response.json()
+    serial_name = data['info']['name'].replace('/', '_')
+    episodes_raw = data['episodes']
     if isinstance(episodes_raw, str):
         episodes_raw = json.loads(episodes_raw)
 
@@ -198,79 +210,7 @@ def download_season():
         file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
         url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
 
-        success = False
-        for _ in range(RETRY_COUNT):
-            try:
-                subprocess.run(["wget", "-O", file_path, url], check=True)
-                success = True
-                break
-            except subprocess.CalledProcessError:
-                continue
+        job = {"cmd": ["wget", "-O", file_path, url], "file": file_name}
+        download_queue.put(job)
 
-    return "Pobrano sezon", 200
-
-@seriale_bp.route("/diagnose/episode", methods=["POST"])
-def diagnose_episode():
-    series_id = request.form['series_id']
-    episode_id = request.form['id']
-
-    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
-    if response.status_code != 200:
-        return "❌ Błąd pobierania danych z API", 500
-
-    try:
-        data = response.json()
-        episodes_raw = data.get("episodes", {})
-        if isinstance(episodes_raw, str):
-            episodes_raw = json.loads(episodes_raw)
-    except Exception as e:
-        return f"❌ Błąd dekodowania JSON: {e}", 500
-
-    for sezon_lista in episodes_raw.values():
-        for ep in sezon_lista:
-            if str(ep['id']) == episode_id:
-                video = ep.get("info", {}).get("video", {})
-                codec = video.get("codec_name")
-                attached = video.get("disposition", {}).get("attached_pic")
-                direct_source = ep.get("direct_source")
-
-                ext = ep.get("container_extension", "mp4")
-                url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
-                try:
-                    head = requests.head(url)
-                    http_status = head.status_code
-                except Exception as e:
-                    http_status = f"Connection error: {e}"
-
-                return jsonify({
-                    "codec_name": codec,
-                    "attached_pic": attached,
-                    "http_status": http_status,
-                    "url": url,
-                    "direct_source": direct_source,
-                    "diagnosis": "🟩 Prawidłowy plik wideo" if codec != "png" and http_status == 200 else "🟥 Miniatura lub niedostępny plik"
-                })
-
-    return "❓ Nie znaleziono odcinka w danych API", 404
-
-@seriale_bp.route("/debug/episode", methods=["POST"])
-def debug_episode():
-    series_id = request.form['series_id']
-    episode_id = request.form['id']
-
-    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
-    if response.status_code != 200:
-        return "❌ Błąd pobierania danych z API", 500
-
-    try:
-        data = response.json()
-        episodes_raw = data.get("episodes", {})
-        if isinstance(episodes_raw, str):
-            episodes_raw = json.loads(episodes_raw)
-        for sezon_lista in episodes_raw.values():
-            for ep in sezon_lista:
-                if str(ep['id']) == episode_id:
-                    return jsonify(ep)
-        return "❓ Nie znaleziono odcinka", 404
-    except Exception as e:
-        return f"❌ Błąd przetwarzania JSON: {e}", 500
+    return "🕐 Dodano sezon do kolejki", 202
