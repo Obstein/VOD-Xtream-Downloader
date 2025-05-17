@@ -89,6 +89,10 @@ def seriale_list():
         return "Błąd pobierania listy seriali", 500
     seriale = response.json()
     html = """
+    <div style="position: fixed; top: 10px; right: 10px; background: #f5f5f5; padding: 10px; border: 1px solid #ccc;">
+        <h4>Kolejka</h4>
+        <ul id="queue-panel"></ul>
+    </div>
     <h1>Seriale</h1>
     {% for s in seriale %}
         <div>
@@ -97,6 +101,23 @@ def seriale_list():
             <p><strong>ID:</strong> {{ s['series_id'] }} | <strong>Num:</strong> {{ s['num'] }} | <strong>Kategoria:</strong> {{ s['category_id'] }}</p>
         </div>
     {% endfor %}
+    <script>
+    function refreshQueuePanel() {
+        fetch('/seriale/queue/status')
+            .then(resp => resp.json())
+            .then(data => {
+                const panel = document.getElementById('queue-panel');
+                panel.innerHTML = '';
+                for (const [id, status] of Object.entries(data)) {
+                    const li = document.createElement('li');
+                    li.textContent = `${status} ${id}`;
+                    panel.appendChild(li);
+                }
+            });
+    }
+    setInterval(refreshQueuePanel, 5000);
+    refreshQueuePanel();
+    </script>
     """
     return render_template_string(html, seriale=seriale)
 
