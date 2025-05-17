@@ -22,7 +22,6 @@ DOWNLOAD_LOG_FILE = "downloads.log"
 
 BASE_API = f"{XTREAM_HOST}:{XTREAM_PORT}/player_api.php?username={XTREAM_USERNAME}&password={XTREAM_PASSWORD}"
 
-# Kolejka i wątek do pobierania
 if os.path.exists(QUEUE_FILE):
     with open(QUEUE_FILE) as f:
         queue_data = json.load(f)
@@ -127,27 +126,50 @@ def serial_detail(series_id):
     <p>{{ serial['plot'] }}</p>
     {% for sezon, eps in sezony.items() %}
         <h3>Sezon {{ sezon }}</h3>
-        <form method="post" action="/seriale/download/season">
-            <input type="hidden" name="series_id" value="{{ series_id }}">
-            <input type="hidden" name="season" value="{{ sezon }}">
-            <button type="submit">📥 Pobierz cały sezon</button>
-        </form>
         <ul>
         {% for ep in eps %}
             <li>
                 S{{ '%02d' % ep['season'] }}E{{ '%02d' % ep['episode_num'] }} - {{ ep['title'] }}
-                <form method="post" action="/seriale/download/episode" style="display:inline">
-                    <input type="hidden" name="series_id" value="{{ series_id }}">
-                    <input type="hidden" name="id" value="{{ ep['id'] }}">
-                    <input type="hidden" name="season" value="{{ ep['season'] }}">
-                    <input type="hidden" name="episode_num" value="{{ ep['episode_num'] }}">
-                    <input type="hidden" name="title" value="{{ ep['title'] }}">
-                    <button title="Dodaj do kolejki">📥</button>
-                </form>
+                <button id="btn-{{ ep['id'] }}" onclick="downloadEpisode('{{ ep['id'] }}', '{{ series_id }}', '{{ ep['season'] }}', '{{ ep['episode_num'] }}', '{{ ep['title'] }}')">📥</button>
             </li>
         {% endfor %}
         </ul>
     {% endfor %}
+    <script>
+    function downloadEpisode(id, series_id, season, episode_num, title) {
+        const btn = document.getElementById('btn-' + id);
+        btn.textContent = '⏳';
+        fetch('/seriale/download/episode', {
+            method: 'POST',
+            body: new URLSearchParams({
+                id,
+                series_id,
+                season,
+                episode_num,
+                title
+            })
+        }).then(resp => {
+            if (!resp.ok) {
+                btn.textContent = '❌';
+            } else {
+                btn.textContent = '⏳';
+            }
+        }).catch(() => {
+            btn.textContent = '❌';
+        });
+    }
+
+    setInterval(() => {
+        fetch('/seriale/queue/status')
+            .then(resp => resp.json())
+            .then(data => {
+                for (const [id, status] of Object.entries(data)) {
+                    const btn = document.getElementById('btn-' + id);
+                    if (btn) btn.textContent = status;
+                }
+            });
+    }, 5000);
+    </script>
     """
     return render_template_string(html, serial=serial, sezony=sezony, series_id=series_id)
 
