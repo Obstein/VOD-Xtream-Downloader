@@ -4,6 +4,7 @@ import requests
 import subprocess
 from urllib.parse import quote
 import json
+import sys
 
 seriale_bp = Blueprint('seriale', __name__)
 
@@ -81,6 +82,7 @@ def serial_detail(series_id):
 
 @seriale_bp.route("/download/episode", methods=["POST"])
 def download_episode():
+    sys.stderr.write("🟢 URUCHOMIONO download_episode()\n")
     data = request.form
     series_id = data['series_id'].strip()
     episode_id = data['id']
@@ -89,7 +91,7 @@ def download_episode():
     episode_num = data.get('episode_num', '1')
 
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
-    print("🔍 EPISODE API RESPONSE:", response.status_code, response.text)
+    sys.stderr.write(f"🔍 EPISODE API RESPONSE: {response.status_code} {response.text}\n")
 
     if response.status_code != 200:
         return "Błąd pobierania metadanych", 500
@@ -125,11 +127,12 @@ def download_episode():
 
 @seriale_bp.route("/download/season", methods=["POST"])
 def download_season():
+    sys.stderr.write("🟢 URUCHOMIONO download_season()\n")
     series_id = request.form['series_id'].strip()
     season = int(request.form['season'])
 
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
-    print("🔍 SEASON API RESPONSE:", response.status_code, response.text)
+    sys.stderr.write(f"🔍 SEASON API RESPONSE: {response.status_code} {response.text}\n")
 
     if response.status_code != 200:
         return "Błąd pobierania danych serialu", 500
