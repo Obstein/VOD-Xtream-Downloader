@@ -48,6 +48,7 @@ def save_completed():
         json.dump(completed_data, f)
 
 def download_worker():
+    global queue_data  # Przeniesione na początek
     # Przywracanie z pliku queue_data do aktywnej kolejki po restarcie, tylko dla nieukończonych
     for job in queue_data:
         if job["episode_id"] not in completed_data:
@@ -74,7 +75,6 @@ def download_worker():
         download_status[episode_id] = status
         download_log.append({"file": job["file"], "status": status})
         download_queue.task_done()
-        global queue_data
         queue_data = [item for item in queue_data if item['episode_id'] != episode_id]
         save_queue()
 
@@ -160,6 +160,7 @@ def seriale_list():
     </script>
     """
     return render_template_string(html, seriale=seriale)
+
 
 
 
