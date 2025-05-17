@@ -48,6 +48,11 @@ def save_completed():
         json.dump(completed_data, f)
 
 def download_worker():
+    # Przywracanie z pliku queue_data do aktywnej kolejki po restarcie, tylko dla nieukończonych
+    for job in queue_data:
+        if job["episode_id"] not in completed_data:
+            download_queue.put(job)
+
     while True:
         job = download_queue.get()
         if job is None:
@@ -155,6 +160,7 @@ def seriale_list():
     </script>
     """
     return render_template_string(html, seriale=seriale)
+
 
 
 @seriale_bp.route("/<int:series_id>")
