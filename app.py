@@ -33,6 +33,11 @@ TEMPLATE = """
 </head>
 <body>
     <h1>Katalog Filmów</h1>
+<nav>
+    <a href="/">Filmy</a> |
+    <a href="/seriale">Seriale</a>
+</nav>
+<hr>
     {% for movie in movies %}
         <div class="item">
             <strong>{{ movie['name'] }}</strong> ({{ movie.get('rating', 'Brak ocen') }})<br>
