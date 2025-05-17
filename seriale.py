@@ -89,6 +89,7 @@ def download_episode():
     episode_num = data.get('episode_num', '1')
 
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    print("🔍 EPISODE API RESPONSE:", response.status_code, response.text)
     if response.status_code != 200:
         return "Błąd pobierania metadanych", 500
 
@@ -127,6 +128,7 @@ def download_season():
     season = int(request.form['season'])
 
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    print("🔍 SEASON API RESPONSE:", response.status_code, response.text)
     if response.status_code != 200:
         return "Błąd pobierania danych serialu", 500
 
