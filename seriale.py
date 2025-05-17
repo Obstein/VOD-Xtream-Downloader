@@ -35,6 +35,7 @@ def seriale_list():
 
 @seriale_bp.route("/seriale/<int:series_id>")
 def serial_detail(series_id):
+    # Zakładamy że przekazywany series_id to faktyczny "num" z listy, czyli identyfikator do API
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
     info = response.json()
     serial = info['info']
@@ -105,7 +106,7 @@ def download_episode():
     except Exception as e:
         return f"Błąd dekodowania odpowiedzi API: {e}", 500
 
-    serial_name = info['name'].replace('/', '_')
+    serial_name = info.get('name', f"serial_{series_id}").replace('/', '_')
 
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
     os.makedirs(path, exist_ok=True)
