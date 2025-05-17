@@ -35,7 +35,6 @@ def seriale_list():
 
 @seriale_bp.route("/seriale/<int:series_id>")
 def serial_detail(series_id):
-    # Zakładamy że przekazywany series_id to faktyczny "num" z listy, czyli identyfikator do API
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
     info = response.json()
     serial = info['info']
@@ -175,3 +174,34 @@ def download_season():
                 continue
 
     return "Pobrano sezon", 200
+
+@seriale_bp.route("/diagnose/episode", methods=["POST"])
+def diagnose_episode():
+    series_id = request.form['series_id']
+    episode_id = request.form['id']
+
+    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    if response.status_code != 200:
+        return "❌ Błąd pobierania danych z API", 500
+
+    try:
+        data = response.json()
+        episodes_raw = data.get("episodes", {})
+        if isinstance(episodes_raw, str):
+            episodes_raw = json.loads(episodes_raw)
+    except Exception as e:
+        return f"❌ Błąd dekodowania JSON: {e}", 500
+
+    for sezon_lista in episodes_raw.values():
+        for ep in sezon_lista:
+            if str(ep['id']) == episode_id:
+                video = ep.get("info", {}).get("video", {})
+                codec = video.get("codec_name")
+                attached = video.get("disposition", {}).get("attached_pic")
+                return jsonify({
+                    "codec_name": codec,
+                    "attached_pic": attached,
+                    "diagnosis": "🟩 Prawidłowy plik wideo" if codec != "png" else "🟥 Miniatura zamiast odcinka"
+                })
+
+    return "❓ Nie znaleziono odcinka w danych API", 404
