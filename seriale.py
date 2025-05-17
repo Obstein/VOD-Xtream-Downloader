@@ -83,7 +83,7 @@ def queue_reorder():
     save_queue()
     return '', 204
 
-@seriale_bp.route("")
+@seriale_bp.route("/")
 def seriale_list():
     response = requests.get(f"{BASE_API}&action=get_series")
     if response.status_code != 200:
