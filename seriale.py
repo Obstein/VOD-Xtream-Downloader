@@ -26,7 +26,7 @@ def seriale_list():
     {% for s in seriale %}
         <div>
             <img src="{{ s['cover'] }}" width="100" />
-            <a href="/seriale/{{ s['num'] }}">{{ s['name'] }}</a>
+            <a href="/seriale/{{ s['series_id'] }}">{{ s['name'] }}</a>
             <p><strong>ID:</strong> {{ s['series_id'] }} | <strong>Num:</strong> {{ s['num'] }} | <strong>Kategoria:</strong> {{ s['category_id'] }}</p>
         </div>
     {% endfor %}
