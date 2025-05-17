@@ -27,6 +27,7 @@ def seriale_list():
         <div>
             <img src="{{ s['cover'] }}" width="100" />
             <a href="/seriale/{{ s['series_id'] }}">{{ s['name'] }}</a>
+            <p><strong>ID:</strong> {{ s['series_id'] }} | <strong>Num:</strong> {{ s['num'] }} | <strong>Kategoria:</strong> {{ s['category_id'] }}</p>
         </div>
     {% endfor %}
     """
@@ -57,7 +58,7 @@ def serial_detail(series_id):
     {% for sezon, eps in sezony.items() %}
         <h3>Sezon {{ sezon }}</h3>
         <form method="post" action="/download/season">
-            <input type="hidden" name="series_id" value="{{ serial['series_id'] }}">
+            <input type="hidden" name="series_id" value="{{ series_id }}">
             <input type="hidden" name="season" value="{{ sezon }}">
             <button type="submit">📥 Pobierz cały sezon</button>
         </form>
@@ -66,7 +67,7 @@ def serial_detail(series_id):
             <li>
                 S{{ '%02d' % ep['season'] }}E{{ '%02d' % ep['episode_num'] }} - {{ ep['title'] }}
                 <form method="post" action="/download/episode" style="display:inline">
-                    <input type="hidden" name="series_id" value="{{ serial['series_id'] }}">
+                    <input type="hidden" name="series_id" value="{{ series_id }}">
                     <input type="hidden" name="id" value="{{ ep['id'] }}">
                     <input type="hidden" name="season" value="{{ ep['season'] }}">
                     <input type="hidden" name="episode_num" value="{{ ep['episode_num'] }}">
@@ -78,7 +79,7 @@ def serial_detail(series_id):
         </ul>
     {% endfor %}
     """
-    return render_template_string(html, serial=serial, sezony=sezony)
+    return render_template_string(html, serial=serial, sezony=sezony, series_id=series_id)
 
 @seriale_bp.route("/download/episode", methods=["POST"])
 def download_episode():
