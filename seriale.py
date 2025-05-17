@@ -225,6 +225,7 @@ def diagnose_episode():
                 video = ep.get("info", {}).get("video", {})
                 codec = video.get("codec_name")
                 attached = video.get("disposition", {}).get("attached_pic")
+                direct_source = ep.get("direct_source")
 
                 url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.mp4"
                 try:
@@ -238,6 +239,7 @@ def diagnose_episode():
                     "attached_pic": attached,
                     "http_status": http_status,
                     "url": url,
+                    "direct_source": direct_source,
                     "diagnosis": "🟩 Prawidłowy plik wideo" if codec != "png" and http_status == 200 else "🟥 Miniatura lub niedostępny plik"
                 })
 
