@@ -105,8 +105,31 @@ def download_episode():
     except Exception as e:
         return f"Błąd dekodowania odpowiedzi API: {e}", 500
 
-    serial_name = info.get('name', f"serial_{series_id}").replace('/', '_')
+    # Diagnostyka pliku: miniatura vs wideo
+    episodes_raw = data.get("episodes", {})
+    if isinstance(episodes_raw, str):
+        episodes_raw = json.loads(episodes_raw)
 
+    found_ep = None
+    for sezon_lista in episodes_raw.values():
+        for ep in sezon_lista:
+            if str(ep['id']) == episode_id:
+                found_ep = ep
+                break
+        if found_ep:
+            break
+
+    if not found_ep:
+        return "❌ Nie znaleziono odcinka", 404
+
+    video_info = found_ep.get("info", {}).get("video", {})
+    codec = video_info.get("codec_name")
+    attached = video_info.get("disposition", {}).get("attached_pic", 0)
+
+    if codec == "png" and attached == 1:
+        return "❌ To nie jest plik wideo, tylko miniatura (cover)", 400
+
+    serial_name = info.get('name', f"serial_{series_id}").replace('/', '_')
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
     os.makedirs(path, exist_ok=True)
 
