@@ -146,6 +146,60 @@ def serial_detail(series_id):
     """
     return render_template_string(html, serial=serial, sezony=sezony, series_id=series_id)
 
+@seriale_bp.route("/download/episode", methods=["POST"])
+def download_episode():
+    data = request.form
+    series_id = data['series_id'].strip()
+    episode_id = data['id']
+    season = data['season']
+    title = data['title']
+    episode_num = data.get('episode_num', '1')
+
+    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    if response.status_code != 200:
+        return "Błąd pobierania metadanych", 500
+
+    data = response.json()
+    episodes_raw = data.get("episodes", {})
+    if isinstance(episodes_raw, str):
+        episodes_raw = json.loads(episodes_raw)
+
+    found_ep = None
+    for sezon_lista in episodes_raw.values():
+        for ep in sezon_lista:
+            if str(ep['id']) == episode_id:
+                found_ep = ep
+                break
+        if found_ep:
+            break
+
+    if not found_ep:
+        return "❌ Nie znaleziono odcinka", 404
+
+    video_info = found_ep.get("info", {}).get("video", {})
+    codec = video_info.get("codec_name")
+    attached = video_info.get("disposition", {}).get("attached_pic", 0)
+
+    if codec == "png" and attached == 1:
+        return "❌ To nie jest plik wideo, tylko miniatura (cover)", 400
+
+    serial_name = data.get('info', {}).get('name', f"serial_{series_id}").replace('/', '_')
+    path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
+    os.makedirs(path, exist_ok=True)
+
+    ext = found_ep.get("container_extension", "mp4")
+    file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.{ext}"
+    file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
+
+    url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
+
+    job = {"cmd": ["wget", "-O", file_path, url], "file": file_name, "episode_id": episode_id, "series": serial_name, "title": title}
+    download_queue.put(job)
+    download_status[episode_id] = "⏳"
+    queue_data.append(job)
+    save_queue()
+    return "", 202
+
 def is_episode_already_downloaded(serial_name, season, episode_num, title, ext):
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
     file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.{ext}"
