@@ -9,7 +9,7 @@ import threading
 import queue
 import time
 
-seriale_bp = Blueprint('seriale', __name__, url_prefix='/seriale')
+seriale_bp = Blueprint('seriale', __name__)
 
 XTREAM_HOST = os.getenv("XTREAM_HOST")
 XTREAM_PORT = os.getenv("XTREAM_PORT")
@@ -83,7 +83,7 @@ def queue_reorder():
     save_queue()
     return '', 204
 
-@seriale_bp.route("")
+@seriale_bp.route("/seriale")
 def seriale_list():
     response = requests.get(f"{BASE_API}&action=get_series")
     if response.status_code != 200:
