@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  vod-catalog:
+    build: .
+    container_name: vod-catalog
+    ports:
+      - "5000:5000"
+    environment:
+      XTREAM_HOST: "http://example.com"
+      XTREAM_PORT: "8080"
+      XTREAM_USERNAME: "demo_user"
+      XTREAM_PASSWORD: "demo_pass"
+      DOWNLOAD_PATH_MOVIES: "/downloads/Filmy"
+      DOWNLOAD_PATH_SERIES: "/downloads/Seriale"
+      RETRY_COUNT: "3"
+    volumes:
+      - /mnt/user/media:/downloads"
