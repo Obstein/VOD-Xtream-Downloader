@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, render_template_string
 import os
 import requests
 import subprocess
+import json
 from urllib.parse import quote
 
 seriale_bp = Blueprint('seriale', __name__)
@@ -35,12 +36,20 @@ def seriale_list():
 def serial_detail(series_id):
     info = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}").json()
     serial = info['info']
-    episodes = info['episodes']
 
-    # Grupujemy po sezonach
+    episodes_raw = info['episodes']
+    if isinstance(episodes_raw, str):
+        episodes_dict = json.loads(episodes_raw)
+    else:
+        episodes_dict = episodes_raw
+
+    all_episodes = []
+    for sezon_lista in episodes_dict.values():
+        all_episodes.extend(sezon_lista)
+
     sezony = {}
-    for ep in episodes:
-        sez = ep['season'] or 1
+    for ep in all_episodes:
+        sez = ep.get('season', 1)
         sezony.setdefault(sez, []).append(ep)
 
     html = """
@@ -62,6 +71,7 @@ def serial_detail(series_id):
                     <input type="hidden" name="id" value="{{ ep['id'] }}">
                     <input type="hidden" name="season" value="{{ ep['season'] }}">
                     <input type="hidden" name="title" value="{{ ep['title'] }}">
+                    <input type="hidden" name="episode_num" value="{{ ep['episode_num'] }}">
                     <button>📥</button>
                 </form>
             </li>
@@ -78,6 +88,7 @@ def download_episode():
     episode_id = data['id']
     season = data['season']
     title = data['title']
+    episode_num = data.get('episode_num', 1)
 
     info = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}").json()['info']
     serial_name = info['name'].replace('/', '_')
@@ -85,7 +96,7 @@ def download_episode():
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
     os.makedirs(path, exist_ok=True)
 
-    file_name = f"S{int(season):02d}E{int(data.get('episode_num', 1)):02d} - {title}.mp4"
+    file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.mp4"
     file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
 
     url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.mp4"
@@ -108,15 +119,28 @@ def download_season():
 
     info = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}").json()
     serial_name = info['info']['name'].replace('/', '_')
-    episodes = [ep for ep in info['episodes'] if str(ep['season']) == season]
 
-    for ep in episodes:
+    episodes_raw = info['episodes']
+    if isinstance(episodes_raw, str):
+        episodes_dict = json.loads(episodes_raw)
+    else:
+        episodes_dict = episodes_raw
+
+    episodes = []
+    for sezon_lista in episodes_dict.values():
+        episodes.extend(sezon_lista)
+
+    for ep in [ep for ep in episodes if str(ep['season']) == season]:
         episode_id = ep['id']
         title = ep['title']
+        episode_num = ep['episode_num']
+
         path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
         os.makedirs(path, exist_ok=True)
-        file_name = f"S{int(season):02d}E{int(ep['episode_num']):02d} - {title}.mp4"
+
+        file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.mp4"
         file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
+
         url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.mp4"
 
         success = False
@@ -129,4 +153,3 @@ def download_season():
                 continue
 
     return "Pobrano sezon", 200
-
