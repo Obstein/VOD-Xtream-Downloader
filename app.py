@@ -85,9 +85,10 @@ def download():
     else:
         return jsonify({"message": f"Nieudane pobieranie: {name}"}), 500
 
+from seriale import seriale_bp
+app.register_blueprint(seriale_bp)
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
 
-from seriale import seriale_bp
-app.register_blueprint(seriale_bp)
 
