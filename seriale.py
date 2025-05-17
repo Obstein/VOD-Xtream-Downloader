@@ -74,6 +74,11 @@ def serial_detail(series_id):
                     <input type="hidden" name="title" value="{{ ep['title'] }}">
                     <button>📥</button>
                 </form>
+                <form method="post" action="/diagnose/episode" style="display:inline">
+                    <input type="hidden" name="series_id" value="{{ series_id }}">
+                    <input type="hidden" name="id" value="{{ ep['id'] }}">
+                    <button title="Diagnozuj">🧪</button>
+                </form>
             </li>
         {% endfor %}
         </ul>
@@ -105,7 +110,6 @@ def download_episode():
     except Exception as e:
         return f"Błąd dekodowania odpowiedzi API: {e}", 500
 
-    # Diagnostyka pliku: miniatura vs wideo
     episodes_raw = data.get("episodes", {})
     if isinstance(episodes_raw, str):
         episodes_raw = json.loads(episodes_raw)
@@ -221,10 +225,20 @@ def diagnose_episode():
                 video = ep.get("info", {}).get("video", {})
                 codec = video.get("codec_name")
                 attached = video.get("disposition", {}).get("attached_pic")
+
+                url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.mp4"
+                try:
+                    head = requests.head(url)
+                    http_status = head.status_code
+                except Exception as e:
+                    http_status = f"Connection error: {e}"
+
                 return jsonify({
                     "codec_name": codec,
                     "attached_pic": attached,
-                    "diagnosis": "🟩 Prawidłowy plik wideo" if codec != "png" else "🟥 Miniatura zamiast odcinka"
+                    "http_status": http_status,
+                    "url": url,
+                    "diagnosis": "🟩 Prawidłowy plik wideo" if codec != "png" and http_status == 200 else "🟥 Miniatura lub niedostępny plik"
                 })
 
     return "❓ Nie znaleziono odcinka w danych API", 404
