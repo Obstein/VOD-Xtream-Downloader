@@ -2,12 +2,11 @@ from flask import Blueprint, request, jsonify, render_template_string
 import os
 import requests
 import subprocess
-import json
 from urllib.parse import quote
+import json
 
 seriale_bp = Blueprint('seriale', __name__)
 
-# Zmienne środowiskowe
 XTREAM_HOST = os.getenv("XTREAM_HOST")
 XTREAM_PORT = os.getenv("XTREAM_PORT")
 XTREAM_USERNAME = os.getenv("XTREAM_USERNAME")
@@ -34,17 +33,16 @@ def seriale_list():
 
 @seriale_bp.route("/seriale/<int:series_id>")
 def serial_detail(series_id):
-    info = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}").json()
+    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    info = response.json()
     serial = info['info']
-
     episodes_raw = info['episodes']
+
     if isinstance(episodes_raw, str):
-        episodes_dict = json.loads(episodes_raw)
-    else:
-        episodes_dict = episodes_raw
+        episodes_raw = json.loads(episodes_raw)
 
     all_episodes = []
-    for sezon_lista in episodes_dict.values():
+    for sezon_lista in episodes_raw.values():
         all_episodes.extend(sezon_lista)
 
     sezony = {}
@@ -70,8 +68,8 @@ def serial_detail(series_id):
                     <input type="hidden" name="series_id" value="{{ serial['series_id'] }}">
                     <input type="hidden" name="id" value="{{ ep['id'] }}">
                     <input type="hidden" name="season" value="{{ ep['season'] }}">
-                    <input type="hidden" name="title" value="{{ ep['title'] }}">
                     <input type="hidden" name="episode_num" value="{{ ep['episode_num'] }}">
+                    <input type="hidden" name="title" value="{{ ep['title'] }}">
                     <button>📥</button>
                 </form>
             </li>
@@ -88,9 +86,17 @@ def download_episode():
     episode_id = data['id']
     season = data['season']
     title = data['title']
-    episode_num = data.get('episode_num', 1)
+    episode_num = data.get('episode_num', '1')
 
-    info = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}").json()['info']
+    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    if response.status_code != 200:
+        return "Błąd pobierania metadanych", 500
+
+    try:
+        info = response.json()['info']
+    except Exception:
+        return "Błąd dekodowania odpowiedzi API", 500
+
     serial_name = info['name'].replace('/', '_')
 
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
@@ -117,30 +123,31 @@ def download_season():
     series_id = request.form['series_id']
     season = request.form['season']
 
-    info = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}").json()
+    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    if response.status_code != 200:
+        return "Błąd pobierania danych serialu", 500
+
+    try:
+        info = response.json()
+    except Exception:
+        return "Błąd dekodowania JSON z API", 500
+
     serial_name = info['info']['name'].replace('/', '_')
 
     episodes_raw = info['episodes']
     if isinstance(episodes_raw, str):
-        episodes_dict = json.loads(episodes_raw)
-    else:
-        episodes_dict = episodes_raw
+        episodes_raw = json.loads(episodes_raw)
 
-    episodes = []
-    for sezon_lista in episodes_dict.values():
-        episodes.extend(sezon_lista)
+    episodes = [ep for sezon_lista in episodes_raw.values() for ep in sezon_lista if str(ep.get('season', '')) == season]
 
-    for ep in [ep for ep in episodes if str(ep['season']) == season]:
+    for ep in episodes:
         episode_id = ep['id']
         title = ep['title']
         episode_num = ep['episode_num']
-
         path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
         os.makedirs(path, exist_ok=True)
-
         file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.mp4"
         file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
-
         url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.mp4"
 
         success = False
