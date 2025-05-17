@@ -82,7 +82,7 @@ def serial_detail(series_id):
 @seriale_bp.route("/download/episode", methods=["POST"])
 def download_episode():
     data = request.form
-    series_id = data['series_id']
+    series_id = data['series_id'].strip()
     episode_id = data['id']
     season = data['season']
     title = data['title']
@@ -93,9 +93,12 @@ def download_episode():
         return "Błąd pobierania metadanych", 500
 
     try:
-        info = response.json()['info']
-    except Exception:
-        return "Błąd dekodowania odpowiedzi API", 500
+        data = response.json()
+        if 'info' not in data:
+            return "Błąd: brak pola 'info' w odpowiedzi API", 500
+        info = data['info']
+    except Exception as e:
+        return f"Błąd dekodowania odpowiedzi API: {e}", 500
 
     serial_name = info['name'].replace('/', '_')
 
@@ -120,7 +123,7 @@ def download_episode():
 
 @seriale_bp.route("/download/season", methods=["POST"])
 def download_season():
-    series_id = request.form['series_id']
+    series_id = request.form['series_id'].strip()
     season = int(request.form['season'])
 
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
@@ -128,9 +131,12 @@ def download_season():
         return "Błąd pobierania danych serialu", 500
 
     try:
-        info = response.json()
-    except Exception:
-        return "Błąd dekodowania JSON z API", 500
+        data = response.json()
+        if 'info' not in data or 'episodes' not in data:
+            return "Błąd: niekompletna odpowiedź z API", 500
+        info = data
+    except Exception as e:
+        return f"Błąd dekodowania JSON: {e}", 500
 
     serial_name = info['info']['name'].replace('/', '_')
 
