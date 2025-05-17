@@ -101,20 +101,14 @@ def seriale_list():
     """
     return render_template_string(html, seriale=seriale)
 
-def is_episode_already_downloaded(serial_name, season, episode_num, title, ext):
-    path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
-    file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.{ext}"
-    file_path = os.path.join(path, file_name.replace(' ', '_'))
-    return os.path.exists(file_path) and os.path.getsize(file_path) > 1000000  # większe niż 1MB
-
 @seriale_bp.route("/<int:series_id>")
 def serial_detail(series_id):
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
     if response.status_code != 200:
-        return f"Błąd pobierania szczegółów serialu ID {series_id}", 404
-    data = response.json()
-    serial = data.get('info', {})
-    episodes_raw = data.get('episodes', {})
+        return "Błąd pobierania danych serialu", 500
+    info = response.json()
+    serial = info['info']
+    episodes_raw = info['episodes']
 
     if isinstance(episodes_raw, str):
         episodes_raw = json.loads(episodes_raw)
@@ -129,15 +123,31 @@ def serial_detail(series_id):
         sezony.setdefault(sez, []).append(ep)
 
     html = """
-    <h1>{{ serial.get('name', 'Brak nazwy') }}</h1>
-    <p>{{ serial.get('plot', '') }}</p>
+    <h1>{{ serial['name'] }}</h1>
+    <p>{{ serial['plot'] }}</p>
     {% for sezon, eps in sezony.items() %}
         <h3>Sezon {{ sezon }}</h3>
         <ul>
         {% for ep in eps %}
-            <li>S{{ '%02d' % ep['season'] }}E{{ '%02d' % ep['episode_num'] }} - {{ ep['title'] }}</li>
+            <li>
+                S{{ '%02d' % ep['season'] }}E{{ '%02d' % ep['episode_num'] }} - {{ ep['title'] }}
+                <form method="post" action="/seriale/download/episode" style="display:inline">
+                    <input type="hidden" name="series_id" value="{{ series_id }}">
+                    <input type="hidden" name="id" value="{{ ep['id'] }}">
+                    <input type="hidden" name="season" value="{{ ep['season'] }}">
+                    <input type="hidden" name="episode_num" value="{{ ep['episode_num'] }}">
+                    <input type="hidden" name="title" value="{{ ep['title'] }}">
+                    <button title="Dodaj do kolejki">📥</button>
+                </form>
+            </li>
         {% endfor %}
         </ul>
     {% endfor %}
     """
-    return render_template_string(html, serial=serial, sezony=sezony)
+    return render_template_string(html, serial=serial, sezony=sezony, series_id=series_id)
+
+def is_episode_already_downloaded(serial_name, season, episode_num, title, ext):
+    path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
+    file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.{ext}"
+    file_path = os.path.join(path, file_name.replace(' ', '_'))
+    return os.path.exists(file_path) and os.path.getsize(file_path) > 1000000  # większe niż 1MB
