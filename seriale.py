@@ -19,6 +19,7 @@ DOWNLOAD_PATH_SERIES = os.getenv("DOWNLOAD_PATH_SERIES", "/downloads/Seriale")
 RETRY_COUNT = int(os.getenv("RETRY_COUNT", 3))
 QUEUE_FILE = "queue.json"
 DOWNLOAD_LOG_FILE = "downloads.log"
+COMPLETED_FILE = "completed.json"
 
 BASE_API = f"{XTREAM_HOST}:{XTREAM_PORT}/player_api.php?username={XTREAM_USERNAME}&password={XTREAM_PASSWORD}"
 
@@ -28,6 +29,12 @@ if os.path.exists(QUEUE_FILE):
 else:
     queue_data = []
 
+if os.path.exists(COMPLETED_FILE):
+    with open(COMPLETED_FILE) as f:
+        completed_data = json.load(f)
+else:
+    completed_data = []
+
 download_queue = queue.Queue()
 download_log = []
 download_status = {}
@@ -35,6 +42,10 @@ download_status = {}
 def save_queue():
     with open(QUEUE_FILE, 'w') as f:
         json.dump(queue_data, f)
+
+def save_completed():
+    with open(COMPLETED_FILE, 'w') as f:
+        json.dump(completed_data, f)
 
 def download_worker():
     while True:
@@ -46,8 +57,11 @@ def download_worker():
             download_status[episode_id] = "⏳"
             with open(DOWNLOAD_LOG_FILE, "a") as logf:
                 logf.write(f"\n=== Pobieranie: {job['file']} ===\n")
-                subprocess.run(job["cmd"], check=True, stdout=logf, stderr=logf)
+                result = subprocess.run(job["cmd"], check=True, stdout=logf, stderr=logf)
             status = "✅"
+            if episode_id not in completed_data:
+                completed_data.append(episode_id)
+                save_completed()
         except subprocess.CalledProcessError:
             with open(DOWNLOAD_LOG_FILE, "a") as logf:
                 logf.write(f"❌ Błąd pobierania: {job['file']}\n")
