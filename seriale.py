@@ -271,8 +271,8 @@ def download_episode():
     codec = video_info.get("codec_name")
     attached = video_info.get("disposition", {}).get("attached_pic", 0)
 
-    if codec == "png" and attached == 1:
-        return "❌ To nie jest plik wideo, tylko miniatura (cover)", 400
+    #if codec == "png" and attached == 1:
+        #return "❌ To nie jest plik wideo, tylko miniatura (cover)", 400
 
     serial_name = data.get('info', {}).get('name', f"serial_{series_id}").replace('/', '_')
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
