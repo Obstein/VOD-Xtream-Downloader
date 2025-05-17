@@ -121,7 +121,7 @@ def download_episode():
 @seriale_bp.route("/download/season", methods=["POST"])
 def download_season():
     series_id = request.form['series_id']
-    season = request.form['season']
+    season = int(request.form['season'])
 
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
     if response.status_code != 200:
@@ -138,7 +138,7 @@ def download_season():
     if isinstance(episodes_raw, str):
         episodes_raw = json.loads(episodes_raw)
 
-    episodes = [ep for sezon_lista in episodes_raw.values() for ep in sezon_lista if str(ep.get('season', '')) == season]
+    episodes = [ep for sezon_lista in episodes_raw.values() for ep in sezon_lista if int(ep.get('season', 0)) == season]
 
     for ep in episodes:
         episode_id = ep['id']
