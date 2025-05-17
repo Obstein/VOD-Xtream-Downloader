@@ -96,6 +96,10 @@ def queue_reorder():
     save_queue()
     return '', 204
 
+@seriale_bp.route("/completed")
+def completed_episodes():
+    return jsonify(completed_data)
+
 @seriale_bp.route("/")
 def seriale_list():
     response = requests.get(f"{BASE_API}&action=get_series")
@@ -116,6 +120,8 @@ def seriale_list():
         </div>
     {% endfor %}
     <script>
+    let completedEpisodes = [];
+
     function refreshQueuePanel() {
         fetch('/seriale/queue/status')
             .then(resp => resp.json())
@@ -129,11 +135,27 @@ def seriale_list():
                 }
             });
     }
+
+    function refreshCompleted() {
+        fetch('/seriale/completed')
+            .then(resp => resp.json())
+            .then(data => {
+                completedEpisodes = data;
+                for (const id of data) {
+                    const btn = document.getElementById('btn-' + id);
+                    if (btn) btn.textContent = '✅';
+                }
+            });
+    }
+
     setInterval(refreshQueuePanel, 5000);
+    setInterval(refreshCompleted, 10000);
     refreshQueuePanel();
+    refreshCompleted();
     </script>
     """
     return render_template_string(html, seriale=seriale)
+
 
 @seriale_bp.route("/<int:series_id>")
 def serial_detail(series_id):
