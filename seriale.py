@@ -127,6 +127,11 @@ def serial_detail(series_id):
     <p>{{ serial['plot'] }}</p>
     {% for sezon, eps in sezony.items() %}
         <h3>Sezon {{ sezon }}</h3>
+        <form method="post" action="/seriale/download/season">
+            <input type="hidden" name="series_id" value="{{ series_id }}">
+            <input type="hidden" name="season" value="{{ sezon }}">
+            <button type="submit">📥 Pobierz cały sezon</button>
+        </form>
         <ul>
         {% for ep in eps %}
             <li>
@@ -199,6 +204,42 @@ def download_episode():
     queue_data.append(job)
     save_queue()
     return "", 202
+
+@seriale_bp.route("/download/season", methods=["POST"])
+def download_season():
+    series_id = request.form['series_id'].strip()
+    season = int(request.form['season'])
+
+    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    if response.status_code != 200:
+        return "Błąd pobierania danych serialu", 500
+
+    data = response.json()
+    serial_name = data['info']['name'].replace('/', '_')
+    episodes_raw = data['episodes']
+    if isinstance(episodes_raw, str):
+        episodes_raw = json.loads(episodes_raw)
+
+    episodes = [ep for sezon_lista in episodes_raw.values() for ep in sezon_lista if int(ep.get('season', 0)) == season]
+
+    for ep in episodes:
+        episode_id = ep['id']
+        title = ep['title']
+        episode_num = ep['episode_num']
+        ext = ep.get("container_extension", "mp4")
+        path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
+        os.makedirs(path, exist_ok=True)
+        file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.{ext}"
+        file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
+        url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
+
+        job = {"cmd": ["wget", "-O", file_path, url], "file": file_name, "episode_id": episode_id, "series": serial_name, "title": title}
+        download_queue.put(job)
+        download_status[episode_id] = "⏳"
+        queue_data.append(job)
+
+    save_queue()
+    return "🕐 Dodano sezon do kolejki", 202
 
 def is_episode_already_downloaded(serial_name, season, episode_num, title, ext):
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
