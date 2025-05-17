@@ -106,3 +106,38 @@ def is_episode_already_downloaded(serial_name, season, episode_num, title, ext):
     file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.{ext}"
     file_path = os.path.join(path, file_name.replace(' ', '_'))
     return os.path.exists(file_path) and os.path.getsize(file_path) > 1000000  # większe niż 1MB
+
+@seriale_bp.route("/<int:series_id>")
+def serial_detail(series_id):
+    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    if response.status_code != 200:
+        return f"Błąd pobierania szczegółów serialu ID {series_id}", 404
+    data = response.json()
+    serial = data.get('info', {})
+    episodes_raw = data.get('episodes', {})
+
+    if isinstance(episodes_raw, str):
+        episodes_raw = json.loads(episodes_raw)
+
+    all_episodes = []
+    for sezon_lista in episodes_raw.values():
+        all_episodes.extend(sezon_lista)
+
+    sezony = {}
+    for ep in all_episodes:
+        sez = ep.get('season', 1)
+        sezony.setdefault(sez, []).append(ep)
+
+    html = """
+    <h1>{{ serial.get('name', 'Brak nazwy') }}</h1>
+    <p>{{ serial.get('plot', '') }}</p>
+    {% for sezon, eps in sezony.items() %}
+        <h3>Sezon {{ sezon }}</h3>
+        <ul>
+        {% for ep in eps %}
+            <li>S{{ '%02d' % ep['season'] }}E{{ '%02d' % ep['episode_num'] }} - {{ ep['title'] }}</li>
+        {% endfor %}
+        </ul>
+    {% endfor %}
+    """
+    return render_template_string(html, serial=serial, sezony=sezony)
