@@ -79,6 +79,11 @@ def serial_detail(series_id):
                     <input type="hidden" name="id" value="{{ ep['id'] }}">
                     <button title="Diagnozuj">🧪</button>
                 </form>
+                <form method="post" action="/debug/episode" style="display:inline">
+                    <input type="hidden" name="series_id" value="{{ series_id }}">
+                    <input type="hidden" name="id" value="{{ ep['id'] }}">
+                    <button title="Debug JSON">🧾</button>
+                </form>
             </li>
         {% endfor %}
         </ul>
@@ -244,3 +249,25 @@ def diagnose_episode():
                 })
 
     return "❓ Nie znaleziono odcinka w danych API", 404
+
+@seriale_bp.route("/debug/episode", methods=["POST"])
+def debug_episode():
+    series_id = request.form['series_id']
+    episode_id = request.form['id']
+
+    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    if response.status_code != 200:
+        return "❌ Błąd pobierania danych z API", 500
+
+    try:
+        data = response.json()
+        episodes_raw = data.get("episodes", {})
+        if isinstance(episodes_raw, str):
+            episodes_raw = json.loads(episodes_raw)
+        for sezon_lista in episodes_raw.values():
+            for ep in sezon_lista:
+                if str(ep['id']) == episode_id:
+                    return jsonify(ep)
+        return "❓ Nie znaleziono odcinka", 404
+    except Exception as e:
+        return f"❌ Błąd przetwarzania JSON: {e}", 500
