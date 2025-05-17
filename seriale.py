@@ -142,10 +142,11 @@ def download_episode():
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
     os.makedirs(path, exist_ok=True)
 
-    file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.mp4"
+    ext = found_ep.get("container_extension", "mp4")
+    file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.{ext}"
     file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
 
-    url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.mp4"
+    url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
 
     success = False
     for _ in range(RETRY_COUNT):
@@ -190,11 +191,12 @@ def download_season():
         episode_id = ep['id']
         title = ep['title']
         episode_num = ep['episode_num']
+        ext = ep.get("container_extension", "mp4")
         path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
         os.makedirs(path, exist_ok=True)
-        file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.mp4"
+        file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.{ext}"
         file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
-        url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.mp4"
+        url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
 
         success = False
         for _ in range(RETRY_COUNT):
@@ -232,7 +234,8 @@ def diagnose_episode():
                 attached = video.get("disposition", {}).get("attached_pic")
                 direct_source = ep.get("direct_source")
 
-                url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.mp4"
+                ext = ep.get("container_extension", "mp4")
+                url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
                 try:
                     head = requests.head(url)
                     http_status = head.status_code
