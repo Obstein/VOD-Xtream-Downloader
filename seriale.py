@@ -85,11 +85,9 @@ def download_nfo(series_id, season, episode):
     if response.status_code != 200:
         return "Błąd pobierania danych serialu", 500
     info = response.json()
-    serial_name = info['info'].get('name')
-    if not serial_name:
-        return "Brak nazwy serialu", 404
+    serial_name = info['info'].get('name', f"serial_{series_id}").replace('/', '_')
 
-    # Szukaj TMDB ID na podstawie tytułu
+    # Wyszukaj TMDB ID
     tmdb_id = search_tmdb_series_id(serial_name)
     if not tmdb_id:
         return f"Nie znaleziono TMDB ID dla: {serial_name}", 404
@@ -99,7 +97,7 @@ def download_nfo(series_id, season, episode):
     if not metadata:
         return "Brak metadanych", 404
 
-    # Generuj plik .nfo
+    # Zbuduj zawartość pliku .nfo
     nfo = f"""
 <episodedetails>
   <title>{metadata['name']}</title>
@@ -110,7 +108,16 @@ def download_nfo(series_id, season, episode):
   <thumb>{'https://image.tmdb.org/t/p/original' + metadata['still_path'] if metadata.get('still_path') else ''}</thumb>
 </episodedetails>
 """
-    return send_file(BytesIO(nfo.encode('utf-8')), mimetype='application/xml', as_attachment=True, download_name=f"S{season:02}E{episode:02}.nfo")
+
+    # Ścieżka zapisu
+    path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
+    os.makedirs(path, exist_ok=True)
+    file_path = os.path.join(path, f"S{season:02}E{episode:02}.nfo")
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(nfo.strip())
+
+    return f"📄 Zapisano plik: {file_path}", 200
 
 
 
