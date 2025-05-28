@@ -39,18 +39,30 @@ else:
 # Szukanie TMDB ID na podstawie tytułu
 from functools import lru_cache
 
+@lru_cache(maxsize=128)
 def search_tmdb_series_id(title):
-    url = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={quote(title)}&language=pl-PL"
+    cleaned_title = (
+        title
+        .replace("PL -", "")
+        .replace("PL-", "")
+        .replace("POLSKI", "")
+        .replace("LEKTOR", "")
+        .replace("DUBBING", "")
+        .strip()
+        .title()  # „opowieść podręcznej” -> „Opowieść Podręcznej”
+    )
+    url = f"https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={quote(cleaned_title)}&language=pl-PL"
     response = requests.get(url)
     print(f"TMDB Search URL: {url}")
     if response.status_code == 200:
         data = response.json()
         results = data.get("results", [])
         if results:
-            print(f"Znaleziono TMDB ID: {results[0]['id']} dla tytułu '{title}'")
+            print(f"Znaleziono TMDB ID: {results[0]['id']} dla tytułu '{cleaned_title}'")
             return results[0]["id"]
-    print("Nie znaleziono TMDB ID")
+    print(f"Nie znaleziono TMDB ID dla: {cleaned_title}")
     return None
+
 
 # Nowa funkcja do pobierania metadanych z TMDB
 def get_tmdb_episode_metadata(tmdb_id, season, episode):
