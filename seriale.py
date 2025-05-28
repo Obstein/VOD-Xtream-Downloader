@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, render_template_string
+from flask import Blueprint, request, jsonify, render_template_string, send_file
 import os
 import requests
 import subprocess
@@ -8,6 +8,9 @@ import sys
 import threading
 import queue
 import time
+from io import BytesIO
+
+
 
 seriale_bp = Blueprint('seriale', __name__, url_prefix='/seriale')
 
