@@ -20,6 +20,7 @@ RETRY_COUNT = int(os.getenv("RETRY_COUNT", 3))
 QUEUE_FILE = "queue.json"
 DOWNLOAD_LOG_FILE = "downloads.log"
 COMPLETED_FILE = "completed.json"
+TMDB_API_KEY = "cfdfac787bf2a6e2c521b93a0309ff2c"
 
 BASE_API = f"{XTREAM_HOST}:{XTREAM_PORT}/player_api.php?username={XTREAM_USERNAME}&password={XTREAM_PASSWORD}"
 
