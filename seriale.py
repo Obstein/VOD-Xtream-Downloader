@@ -80,14 +80,34 @@ def get_tmdb_episode_metadata(tmdb_id, season, episode):
 # Trasa do pobierania pliku .nfo
 @seriale_bp.route("/nfo/<int:series_id>/<int:season>/<int:episode>")
 def download_nfo(series_id, season, episode):
-    # Pobierz nazwę serialu z Xtream Codes
+    # Pobierz nazwę serialu
     response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
     if response.status_code != 200:
         return "Błąd pobierania danych serialu", 500
     info = response.json()
     serial_name = info['info'].get('name', f"serial_{series_id}").replace('/', '_')
 
-    # Wyszukaj TMDB ID
+    # Znajdź odcinek
+    episodes_raw = info.get('episodes', {})
+    if isinstance(episodes_raw, str):
+        episodes_raw = json.loads(episodes_raw)
+
+    found_ep = None
+    for sezon_lista in episodes_raw.values():
+        for ep in sezon_lista:
+            if int(ep.get('season', 0)) == season and int(ep.get('episode_num', 0)) == episode:
+                found_ep = ep
+                break
+        if found_ep:
+            break
+
+    if not found_ep:
+        return "❌ Nie znaleziono odcinka", 404
+
+    ep_title = found_ep.get('title', f"Odcinek {episode}").replace('/', '_')
+    ext = found_ep.get('container_extension', 'mp4')
+
+    # Pobierz TMDB ID
     tmdb_id = search_tmdb_series_id(serial_name)
     if not tmdb_id:
         return f"Nie znaleziono TMDB ID dla: {serial_name}", 404
@@ -97,7 +117,7 @@ def download_nfo(series_id, season, episode):
     if not metadata:
         return "Brak metadanych", 404
 
-    # Zbuduj zawartość pliku .nfo
+    # Treść NFO
     nfo = f"""
 <episodedetails>
   <title>{metadata['name']}</title>
@@ -109,15 +129,17 @@ def download_nfo(series_id, season, episode):
 </episodedetails>
 """
 
-    # Ścieżka zapisu
+    # Ścieżka i nazwa taka jak plik wideo
+    file_name = f"S{season:02}E{episode:02} - {ep_title}"
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
     os.makedirs(path, exist_ok=True)
-    file_path = os.path.join(path, f"S{season:02}E{episode:02}.nfo")
+    file_path = os.path.join(path, file_name.replace(' ', '_') + '.nfo')
 
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(nfo.strip())
 
     return f"📄 Zapisano plik: {file_path}", 200
+
 
 
 
