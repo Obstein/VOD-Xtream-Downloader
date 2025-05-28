@@ -20,7 +20,7 @@ RETRY_COUNT = int(os.getenv("RETRY_COUNT", 3))
 QUEUE_FILE = "queue.json"
 DOWNLOAD_LOG_FILE = "downloads.log"
 COMPLETED_FILE = "completed.json"
-TMDB_API_KEY = "bjgjggjjgjg"
+TMDB_API_KEY = "cfdfac787bf2a6e2c521b93a0309ff2c"
 
 BASE_API = f"{XTREAM_HOST}:{XTREAM_PORT}/player_api.php?username={XTREAM_USERNAME}&password={XTREAM_PASSWORD}"
 
@@ -63,12 +63,28 @@ def get_tmdb_episode_metadata(tmdb_id, season, episode):
     return None
 
 # Trasa do pobierania pliku .nfo
-@seriale_bp.route("/nfo/<int:tmdb_id>/<int:season>/<int:episode>")
-def download_nfo(tmdb_id, season, episode):
+@seriale_bp.route("/nfo/<int:series_id>/<int:season>/<int:episode>")
+def download_nfo(series_id, season, episode):
+    # Pobierz nazwę serialu z Xtream Codes
+    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    if response.status_code != 200:
+        return "Błąd pobierania danych serialu", 500
+    info = response.json()
+    serial_name = info['info'].get('name')
+    if not serial_name:
+        return "Brak nazwy serialu", 404
+
+    # Szukaj TMDB ID na podstawie tytułu
+    tmdb_id = search_tmdb_series_id(serial_name)
+    if not tmdb_id:
+        return f"Nie znaleziono TMDB ID dla: {serial_name}", 404
+
+    # Pobierz metadane odcinka
     metadata = get_tmdb_episode_metadata(tmdb_id, season, episode)
     if not metadata:
         return "Brak metadanych", 404
 
+    # Generuj plik .nfo
     nfo = f"""
 <episodedetails>
   <title>{metadata['name']}</title>
