@@ -40,6 +40,8 @@ else:
 def get_tmdb_episode_metadata(tmdb_id, season, episode):
     url = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season}/episode/{episode}?api_key={TMDB_API_KEY}&language=pl-PL"
     response = requests.get(url)
+    print(f"TMDB Request URL: {url}")
+    print(f"TMDB Response [{response.status_code}]: {response.text}")
     if response.status_code == 200:
         return response.json()
     return None
