@@ -23,33 +23,6 @@ COMPLETED_FILE = "completed.json"
 
 BASE_API = f"{XTREAM_HOST}:{XTREAM_PORT}/player_api.php?username={XTREAM_USERNAME}&password={XTREAM_PASSWORD}"
 
-TMDB_API_KEY = os.getenv("TMDB_API_KEY")
-TMDB_LANGUAGE = os.getenv("TMDB_LANGUAGE", "pl")
-
-def search_tmdb_series(title):
-    url = f"https://api.themoviedb.org/3/search/tv"
-    params = {"api_key": TMDB_API_KEY, "query": title, "language": TMDB_LANGUAGE}
-    r = requests.get(url, params=params)
-    r.raise_for_status()
-    results = r.json().get("results", [])
-    return results[0] if results else None
-
-def get_tmdb_season_details(tmdb_id, season_number):
-    url = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season_number}"
-    params = {"api_key": TMDB_API_KEY, "language": TMDB_LANGUAGE}
-    r = requests.get(url, params=params)
-    r.raise_for_status()
-    return r.json()
-
-def save_metadata_to_nfo(path, metadata):
-    nfo_path = os.path.splitext(path)[0] + ".nfo"
-    with open(nfo_path, "w", encoding="utf-8") as f:
-        f.write("<episodedetails>\n")
-        for key, value in metadata.items():
-            f.write(f"  <{key}>{value}</{key}>\n")
-        f.write("</episodedetails>\n")
-
-
 if os.path.exists(QUEUE_FILE):
     with open(QUEUE_FILE) as f:
         queue_data = json.load(f)
@@ -304,24 +277,6 @@ def download_episode():
     serial_name = data.get('info', {}).get('name', f"serial_{series_id}").replace('/', '_')
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
     os.makedirs(path, exist_ok=True)
-
-tmdb_match = search_tmdb_series(serial_name)
-tmdb_id = tmdb_match["id"] if tmdb_match else None
-season_details = get_tmdb_season_details(tmdb_id, int(season)) if tmdb_id else {}
-
-tmdb_episode = next((e for e in season_details.get("episodes", []) if str(e["episode_number"]) == episode_num), None)
-
-metadata = {
-    "title": title,
-    "season": season,
-    "episode": episode_num,
-    "plot": tmdb_episode.get("overview", "") if tmdb_episode else found_ep.get("plot", ""),
-    "aired": tmdb_episode.get("air_date", "") if tmdb_episode else found_ep.get("release_date", ""),
-    "runtime": tmdb_episode.get("runtime", ""),
-    "showtitle": serial_name,
-}
-save_metadata_to_nfo(file_path, metadata)
-
 
     ext = found_ep.get("container_extension", "mp4")
     file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.{ext}"
