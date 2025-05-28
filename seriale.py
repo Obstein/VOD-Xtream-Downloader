@@ -194,7 +194,6 @@ def serial_detail(series_id):
     return render_template_string(html, serial=serial, sezony=sezony, series_id=series_id)
 
 @seriale_bp.route("/download/episode", methods=["POST"])
-
 def download_episode():
     data = request.form
     series_id = data['series_id'].strip()
@@ -233,20 +232,6 @@ def download_episode():
     file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
     url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
 
-    tmdb_match = search_tmdb_series(serial_name)
-    tmdb_id = tmdb_match["id"] if tmdb_match else None
-    season_details = get_tmdb_season_details(tmdb_id, int(season)) if tmdb_id else {}
-    tmdb_episode = next((e for e in season_details.get("episodes", []) if str(e.get("episode_number")) == str(episode_num)), None)
-    metadata = {
-        "title": title,
-        "season": season,
-        "episode": episode_num,
-        "plot": tmdb_episode.get("overview", "") if tmdb_episode else found_ep.get("plot", ""),
-        "aired": tmdb_episode.get("air_date", "") if tmdb_episode else found_ep.get("release_date", ""),
-        "runtime": tmdb_episode.get("runtime", "") if tmdb_episode else "",
-        "showtitle": serial_name,
-    }
-    
     job = {"cmd": ["wget", "-O", file_path, url], "file": file_name, "episode_id": episode_id, "series": serial_name, "title": title}
     download_queue.put(job)
     download_status[episode_id] = "⏳"
@@ -308,7 +293,6 @@ def download_nfo():
     return "✅ Utworzono plik NFO", 200
 
 @seriale_bp.route("/download/season", methods=["POST"])
-
 def download_season():
     series_id = request.form['series_id'].strip()
     season = int(request.form['season'])
@@ -325,10 +309,6 @@ def download_season():
 
     episodes = [ep for sezon_lista in episodes_raw.values() for ep in sezon_lista if int(ep.get('season', 0)) == season]
 
-    tmdb_match = search_tmdb_series(serial_name)
-    tmdb_id = tmdb_match["id"] if tmdb_match else None
-    season_details = get_tmdb_season_details(tmdb_id, season) if tmdb_id else {}
-
     for ep in episodes:
         episode_id = ep['id']
         title = ep['title']
@@ -340,21 +320,10 @@ def download_season():
         file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
         url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
 
-        tmdb_episode = next((e for e in season_details.get("episodes", []) if str(e["episode_number"]) == str(ep["episode_num"])), None)
-        metadata = {
-            "title": title,
-            "season": season,
-            "episode": episode_num,
-            "plot": tmdb_episode.get("overview", "") if tmdb_episode else ep.get("plot", ""),
-            "aired": tmdb_episode.get("air_date", "") if tmdb_episode else ep.get("release_date", ""),
-            "runtime": tmdb_episode.get("runtime", ""),
-            "showtitle": serial_name,
-        }
-        
         job = {"cmd": ["wget", "-O", file_path, url], "file": file_name, "episode_id": episode_id, "series": serial_name, "title": title}
         download_queue.put(job)
         download_status[episode_id] = "⏳"
         queue_data.append(job)
 
     save_queue()
-    return "🕐 Dodano sezon do kolejki", 202
+    return "🕐 Dodano sezon do kolejki", 202"🕐 Dodano sezon do kolejki", 202
