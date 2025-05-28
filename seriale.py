@@ -21,10 +21,34 @@ QUEUE_FILE = "queue.json"
 DOWNLOAD_LOG_FILE = "downloads.log"
 COMPLETED_FILE = "completed.json"
 
-TMDB_API_KEY = "cfdfac787bf2a6e2c521b93a0309ff2c"
+BASE_API = f"{XTREAM_HOST}:{XTREAM_PORT}/player_api.php?username={XTREAM_USERNAME}&password={XTREAM_PASSWORD}"
+
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 TMDB_LANGUAGE = os.getenv("TMDB_LANGUAGE", "pl")
 
-BASE_API = f"{XTREAM_HOST}:{XTREAM_PORT}/player_api.php?username={XTREAM_USERNAME}&password={XTREAM_PASSWORD}"
+def search_tmdb_series(title):
+    url = f"https://api.themoviedb.org/3/search/tv"
+    params = {"api_key": TMDB_API_KEY, "query": title, "language": TMDB_LANGUAGE}
+    r = requests.get(url, params=params)
+    r.raise_for_status()
+    results = r.json().get("results", [])
+    return results[0] if results else None
+
+def get_tmdb_season_details(tmdb_id, season_number):
+    url = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season_number}"
+    params = {"api_key": TMDB_API_KEY, "language": TMDB_LANGUAGE}
+    r = requests.get(url, params=params)
+    r.raise_for_status()
+    return r.json()
+
+def save_metadata_to_nfo(path, metadata):
+    nfo_path = os.path.splitext(path)[0] + ".nfo"
+    with open(nfo_path, "w", encoding="utf-8") as f:
+        f.write("<episodedetails>\n")
+        for key, value in metadata.items():
+            f.write(f"  <{key}>{value}</{key}>\n")
+        f.write("</episodedetails>\n")
+
 
 if os.path.exists(QUEUE_FILE):
     with open(QUEUE_FILE) as f:
@@ -50,31 +74,9 @@ def save_completed():
     with open(COMPLETED_FILE, 'w') as f:
         json.dump(completed_data, f)
 
-def search_tmdb_series(title):
-    url = f"https://api.themoviedb.org/3/search/tv"
-    params = {"api_key": TMDB_API_KEY, "query": title, "language": TMDB_LANGUAGE}
-    r = requests.get(url, params=params)
-    r.raise_for_status()
-    results = r.json().get("results", [])
-    return results[0] if results else None
-
-def get_tmdb_season_details(tmdb_id, season_number):
-    url = f"https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season_number}"
-    params = {"api_key": TMDB_API_KEY, "language": TMDB_LANGUAGE}
-    r = requests.get(url, params=params)
-    r.raise_for_status()
-    return r.json()
-
-def save_metadata_to_nfo(path, metadata):
-    nfo_path = os.path.splitext(path)[0] + ".nfo"
-    with open(nfo_path, "w", encoding="utf-8") as f:
-        f.write("<episodedetails>\n")
-        for key, value in metadata.items():
-            f.write(f"  <{key}>{value}</{key}>\n")
-        f.write("</episodedetails>\n")
-
 def download_worker():
-    global queue_data
+    global queue_data  # Przeniesione na początek
+    # Przywracanie z pliku queue_data do aktywnej kolejki po restarcie, tylko dla nieukończonych
     for job in queue_data:
         if job["episode_id"] not in completed_data:
             download_queue.put(job)
@@ -104,6 +106,163 @@ def download_worker():
         save_queue()
 
 threading.Thread(target=download_worker, daemon=True).start()
+
+@seriale_bp.route("/queue/status")
+def queue_status():
+    return jsonify(download_status)
+
+@seriale_bp.route("/queue/remove", methods=["POST"])
+def queue_remove():
+    episode_id = request.form.get("id")
+    global queue_data
+    queue_data = [item for item in queue_data if item['episode_id'] != episode_id]
+    download_status.pop(episode_id, None)
+    save_queue()
+    return '', 204
+
+@seriale_bp.route("/queue/reorder", methods=["POST"])
+def queue_reorder():
+    order = request.json.get("order", [])
+    global queue_data
+    queue_data.sort(key=lambda x: order.index(x['episode_id']) if x['episode_id'] in order else len(order))
+    save_queue()
+    return '', 204
+
+@seriale_bp.route("/completed")
+def completed_episodes():
+    return jsonify(completed_data)
+
+@seriale_bp.route("/")
+def seriale_list():
+    response = requests.get(f"{BASE_API}&action=get_series")
+    if response.status_code != 200:
+        return "Błąd pobierania listy seriali", 500
+    seriale = response.json()
+    html = """
+    <div style="position: fixed; top: 10px; right: 10px; background: #f5f5f5; padding: 10px; border: 1px solid #ccc;">
+        <h4>Kolejka</h4>
+        <ul id="queue-panel"></ul>
+    </div>
+    <h1>Seriale</h1>
+    {% for s in seriale %}
+        <div>
+            <img src="{{ s['cover'] }}" width="100" />
+            <a href="/seriale/{{ s['series_id'] }}">{{ s['name'] }}</a>
+            <p><strong>ID:</strong> {{ s['series_id'] }} | <strong>Num:</strong> {{ s['num'] }} | <strong>Kategoria:</strong> {{ s['category_id'] }}</p>
+        </div>
+    {% endfor %}
+    <script>
+    let completedEpisodes = [];
+
+    function refreshQueuePanel() {
+        fetch('/seriale/queue/status')
+            .then(resp => resp.json())
+            .then(data => {
+                const panel = document.getElementById('queue-panel');
+                panel.innerHTML = '';
+                for (const [id, status] of Object.entries(data)) {
+                    const li = document.createElement('li');
+                    li.textContent = `${status} ${id}`;
+                    panel.appendChild(li);
+                }
+            });
+    }
+
+    function refreshCompleted() {
+        fetch('/seriale/completed')
+            .then(resp => resp.json())
+            .then(data => {
+                completedEpisodes = data;
+                for (const id of data) {
+                    const btn = document.getElementById('btn-' + id);
+                    if (btn) btn.textContent = '✅';
+                }
+            });
+    }
+
+    setInterval(refreshQueuePanel, 5000);
+    setInterval(refreshCompleted, 10000);
+    refreshQueuePanel();
+    refreshCompleted();
+    </script>
+    """
+    return render_template_string(html, seriale=seriale)
+
+
+
+
+@seriale_bp.route("/<int:series_id>")
+def serial_detail(series_id):
+    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    if response.status_code != 200:
+        return "Błąd pobierania danych serialu", 500
+    info = response.json()
+    serial = info['info']
+    episodes_raw = info['episodes']
+
+    if isinstance(episodes_raw, str):
+        episodes_raw = json.loads(episodes_raw)
+
+    all_episodes = []
+    for sezon_lista in episodes_raw.values():
+        all_episodes.extend(sezon_lista)
+
+    sezony = {}
+    for ep in all_episodes:
+        sez = ep.get('season', 1)
+        sezony.setdefault(sez, []).append(ep)
+
+    html = """
+    <h1>{{ serial['name'] }}</h1>
+    <p>{{ serial['plot'] }}</p>
+    {% for sezon, eps in sezony.items() %}
+        <h3>Sezon {{ sezon }}</h3>
+        <ul>
+        {% for ep in eps %}
+            <li>
+                S{{ '%02d' % ep['season'] }}E{{ '%02d' % ep['episode_num'] }} - {{ ep['title'] }}
+                <button id="btn-{{ ep['id'] }}" onclick="downloadEpisode('{{ ep['id'] }}', '{{ series_id }}', '{{ ep['season'] }}', '{{ ep['episode_num'] }}', '{{ ep['title'] }}')">📥</button>
+            </li>
+        {% endfor %}
+        </ul>
+    {% endfor %}
+    <script>
+    function downloadEpisode(id, series_id, season, episode_num, title) {
+        const btn = document.getElementById('btn-' + id);
+        btn.textContent = '⏳';
+        fetch('/seriale/download/episode', {
+            method: 'POST',
+            body: new URLSearchParams({
+                id,
+                series_id,
+                season,
+                episode_num,
+                title
+            })
+        }).then(resp => {
+            if (!resp.ok) {
+                btn.textContent = '❌';
+            } else {
+                btn.textContent = '⏳';
+            }
+        }).catch(() => {
+            btn.textContent = '❌';
+        });
+    }
+
+    setInterval(() => {
+        fetch('/seriale/queue/status')
+            .then(resp => resp.json())
+            .then(data => {
+                for (const [id, status] of Object.entries(data)) {
+                    const btn = document.getElementById('btn-' + id);
+                    if (btn) btn.textContent = status;
+                }
+            });
+    }, 5000);
+    </script>
+    """
+    return render_template_string(html, serial=serial, sezony=sezony, series_id=series_id)
 
 @seriale_bp.route("/download/episode", methods=["POST"])
 def download_episode():
@@ -135,32 +294,40 @@ def download_episode():
     if not found_ep:
         return "❌ Nie znaleziono odcinka", 404
 
+    video_info = found_ep.get("info", {}).get("video", {})
+    codec = video_info.get("codec_name")
+    attached = video_info.get("disposition", {}).get("attached_pic", 0)
+
+    #if codec == "png" and attached == 1:
+        #return "❌ To nie jest plik wideo, tylko miniatura (cover)", 400
+
     serial_name = data.get('info', {}).get('name', f"serial_{series_id}").replace('/', '_')
     path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
     os.makedirs(path, exist_ok=True)
+
+tmdb_match = search_tmdb_series(serial_name)
+tmdb_id = tmdb_match["id"] if tmdb_match else None
+season_details = get_tmdb_season_details(tmdb_id, int(season)) if tmdb_id else {}
+
+tmdb_episode = next((e for e in season_details.get("episodes", []) if str(e["episode_number"]) == episode_num), None)
+
+metadata = {
+    "title": title,
+    "season": season,
+    "episode": episode_num,
+    "plot": tmdb_episode.get("overview", "") if tmdb_episode else found_ep.get("plot", ""),
+    "aired": tmdb_episode.get("air_date", "") if tmdb_episode else found_ep.get("release_date", ""),
+    "runtime": tmdb_episode.get("runtime", ""),
+    "showtitle": serial_name,
+}
+save_metadata_to_nfo(file_path, metadata)
+
 
     ext = found_ep.get("container_extension", "mp4")
     file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.{ext}"
     file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
 
     url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
-
-    # TMDB metadata
-    tmdb_match = search_tmdb_series(serial_name)
-    tmdb_id = tmdb_match["id"] if tmdb_match else None
-    season_details = get_tmdb_season_details(tmdb_id, int(season)) if tmdb_id else {}
-    tmdb_episode = next((e for e in season_details.get("episodes", []) if str(e["episode_number"]) == episode_num), None)
-
-    metadata = {
-        "title": title,
-        "season": season,
-        "episode": episode_num,
-        "plot": tmdb_episode.get("overview", "") if tmdb_episode else found_ep.get("plot", ""),
-        "aired": tmdb_episode.get("air_date", "") if tmdb_episode else found_ep.get("release_date", ""),
-        "runtime": tmdb_episode.get("runtime", ""),
-        "showtitle": serial_name,
-    }
-    save_metadata_to_nfo(file_path, metadata)
 
     job = {"cmd": ["wget", "-O", file_path, url], "file": file_name, "episode_id": episode_id, "series": serial_name, "title": title}
     download_queue.put(job)
@@ -186,10 +353,6 @@ def download_season():
 
     episodes = [ep for sezon_lista in episodes_raw.values() for ep in sezon_lista if int(ep.get('season', 0)) == season]
 
-    tmdb_match = search_tmdb_series(serial_name)
-    tmdb_id = tmdb_match["id"] if tmdb_match else None
-    season_details = get_tmdb_season_details(tmdb_id, season) if tmdb_id else {}
-
     for ep in episodes:
         episode_id = ep['id']
         title = ep['title']
@@ -201,19 +364,6 @@ def download_season():
         file_path = os.path.join(path, quote(file_name.replace(' ', '_')))
         url = f"{XTREAM_HOST}:{XTREAM_PORT}/series/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{episode_id}.{ext}"
 
-        tmdb_episode = next((e for e in season_details.get("episodes", []) if str(e["episode_number"]) == str(ep["episode_num"])), None)
-
-        metadata = {
-            "title": title,
-            "season": season,
-            "episode": episode_num,
-            "plot": tmdb_episode.get("overview", "") if tmdb_episode else ep.get("plot", ""),
-            "aired": tmdb_episode.get("air_date", "") if tmdb_episode else ep.get("release_date", ""),
-            "runtime": tmdb_episode.get("runtime", ""),
-            "showtitle": serial_name,
-        }
-        save_metadata_to_nfo(file_path, metadata)
-
         job = {"cmd": ["wget", "-O", file_path, url], "file": file_name, "episode_id": episode_id, "series": serial_name, "title": title}
         download_queue.put(job)
         download_status[episode_id] = "⏳"
@@ -221,3 +371,9 @@ def download_season():
 
     save_queue()
     return "🕐 Dodano sezon do kolejki", 202
+
+def is_episode_already_downloaded(serial_name, season, episode_num, title, ext):
+    path = os.path.join(DOWNLOAD_PATH_SERIES, serial_name, f"Sezon {season}")
+    file_name = f"S{int(season):02d}E{int(episode_num):02d} - {title}.{ext}"
+    file_path = os.path.join(path, file_name.replace(' ', '_'))
+    return os.path.exists(file_path) and os.path.getsize(file_path) > 1000000  # większe niż 1MB
