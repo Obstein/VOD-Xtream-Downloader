@@ -326,4 +326,4 @@ def download_season():
         queue_data.append(job)
 
     save_queue()
-    return "🕐 Dodano sezon do kolejki", 202"🕐 Dodano sezon do kolejki", 202
+    return "🕐 Dodano sezon do kolejki", 202
