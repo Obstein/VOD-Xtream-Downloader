@@ -227,14 +227,14 @@ def download_episode():
     tmdb_match = search_tmdb_series(serial_name)
     tmdb_id = tmdb_match["id"] if tmdb_match else None
     season_details = get_tmdb_season_details(tmdb_id, int(season)) if tmdb_id else {}
-    tmdb_episode = next((e for e in season_details.get("episodes", []) if str(e["episode_number"]) == episode_num), None)
+    tmdb_episode = next((e for e in season_details.get("episodes", []) if str(e.get("episode_number")) == str(episode_num)), None)
     metadata = {
         "title": title,
         "season": season,
         "episode": episode_num,
         "plot": tmdb_episode.get("overview", "") if tmdb_episode else found_ep.get("plot", ""),
         "aired": tmdb_episode.get("air_date", "") if tmdb_episode else found_ep.get("release_date", ""),
-        "runtime": tmdb_episode.get("runtime", ""),
+        "runtime": tmdb_episode.get("runtime", "") if tmdb_episode else "",
         "showtitle": serial_name,
     }
     save_metadata_to_nfo(file_path, metadata)
