@@ -8,6 +8,26 @@
         body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; }
         .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         h1 { color: #333; text-align: center; }
+        .search-form { text-align: center; margin-bottom: 20px; }
+        .search-form input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 60%;
+            max-width: 400px;
+            margin-right: 10px;
+        }
+        .search-form button {
+            padding: 8px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .search-form button:hover {
+            background-color: #0056b3;
+        }
         .series-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
         .series-item { border: 1px solid #ddd; border-radius: 5px; padding: 10px; text-align: center; background-color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .series-item img { max-width: 100%; height: auto; border-radius: 3px; margin-bottom: 10px; }
@@ -19,6 +39,12 @@
 <body>
     <div class="container">
         <h1>Dostępne Seriale</h1>
+
+        <form class="search-form" action="{{ url_for('seriale.seriale_list') }}" method="get">
+            <input type="text" name="query" placeholder="Szukaj serialu..." value="{{ request.args.get('query', '') }}">
+            <button type="submit">Szukaj</button>
+        </form>
+
         <div class="series-grid">
             {% for serial in seriale %}
             <div class="series-item">
@@ -28,6 +54,9 @@
                 <h2><a href="{{ url_for('seriale.serial_detail', series_id=serial.series_id) }}">{{ serial.name }}</a></h2>
             </div>
             {% endfor %}
+            {% if not seriale %}
+            <p style="grid-column: 1 / -1; text-align: center;">Brak seriali spełniających kryteria wyszukiwania.</p>
+            {% endif %}
         </div>
         <p style="text-align: center; margin-top: 20px;"><a href="{{ url_for('seriale.queue_status') }}">Status kolejki</a></p>
         <p style="text-align: center;"><a href="{{ url_for('seriale.completed_episodes') }}">Pobrane odcinki</a></p>
