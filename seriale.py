@@ -351,46 +351,39 @@ def serial_detail(series_id):
         return "Serial nie znaleziony", 404
 
     episodes_by_season = {}
+    for episode_id, episode_data in episodes_raw.items():
+        season = episode_data['season']
+        if season not in episodes_by_season:
+            episodes_by_season[season] = []
+        episodes_by_season[season].append(episode_data)
     
-    # === KLUCZOWA ZMIANA TUTAJ: Iterujemy przez sezony, a potem przez odcinki w każdym sezonie ===
-    # episodes_raw powinno być słownikiem, np. {"1": [ep1_data, ep2_data], "2": [ep3_data]}
-    for season_num_str, episodes_list_for_season in episodes_raw.items():
-        try:
-            season_num = int(season_num_str) # Konwertuj numer sezonu na int dla sortowania
-        except ValueError:
-            print(f"Ostrzeżenie: Nieprawidłowy numer sezonu '{season_num_str}' dla serialu {series_id}. Pomijam.")
-            continue # Pomiń ten sezon, jeśli numer jest nieprawidłowy
-
-        episodes_by_season[season_num] = []
-        
-        for episode_data in episodes_list_for_season:
-            # Sprawdź, czy 'id' i 'episode_num' istnieją w danych odcinka
-            if 'id' in episode_data and 'episode_num' in episode_data:
-                episodes_by_season[season_num].append(episode_data)
-            else:
-                print(f"Ostrzeżenie: Brak klucza 'id' lub 'episode_num' w danych odcinka: {episode_data}")
-
     # Sortuj odcinki w każdym sezonie według numeru odcinka
     for season in episodes_by_season:
         episodes_by_season[season].sort(key=lambda x: int(x['episode_num']))
 
     # Przygotuj zestaw ID pobranych odcinków dla szybkiego sprawdzania
-    # Upewnij się, że completed_data jest załadowane
+    # Upewnij się, że completed_data jest załadowane (powinno być z load_completed() przy starcie aplikacji)
     completed_episode_ids = {str(item['episode_id']) for item in completed_data if 'episode_id' in item}
 
     # Dodaj status do każdego odcinka
     for season, episodes in episodes_by_season.items():
         for episode in episodes:
-            # Użyj 'id' jako klucza ID odcinka z API
-            episode_id_str = str(episode['id']) 
+            episode_id_str = str(episode['episode_id']) # Upewnij się, że ID jest stringiem do porównania
 
             if episode_id_str in download_status:
+                # Odcinek jest w kolejce lub jest pobierany/zakończył się z błędem
                 episode['status'] = download_status[episode_id_str]
             elif episode_id_str in completed_episode_ids:
+                # Odcinek został pomyślnie pobrany i zapisany w completed.json
                 episode['status'] = "✅ Pobrano"
             else:
-                episode['status'] = "" 
+                # Odcinek nie był pobierany ani nie został jeszcze pobrany
+                episode['status'] = "" # Lub None, aby nie wyświetlać nic
             
+            # Opcjonalnie: status "W kolejce" dla zadań, które jeszcze nie zaczęły pobierania
+            # Jeśli chcesz rozróżnić "w kolejce" od "pobierany", musiałbyś zmodyfikować download_status
+            # lub dodać inny sposób śledzenia. Na razie '⏳' oznacza 'w kolejce/pobierany'.
+
     return render_template("serial_detail.html", series_info=series_info, episodes_by_season=episodes_by_season)
 
 
