@@ -87,16 +87,25 @@
         }
 
         function downloadNFO(seriesId, season, episodeNum) {
-            fetch('{{ url_for("seriale.download_nfo", series_id=series_id, season=season, episode=episodeNum) }}')
-            .then(response => response.text())
-            .then(data => {
-                alert(data);
-            })
-            .catch(error => {
-                console.error('Błąd NFO:', error);
-                alert('Błąd pobierania pliku NFO.');
-            });
-        }
+        // Budujemy URL dynamicznie w JavaScript
+        const url = `/seriale/nfo/${seriesId}/${season}/${episodeNum}`;
+        
+        fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                // Jeśli odpowiedź nie jest OK (np. 404, 500), rzuć błąd
+                return response.text().then(text => { throw new Error(text) });
+            }
+            return response.text();
+        })
+        .then(data => {
+            alert(data); // Wyświetl odpowiedź z serwera
+        })
+        .catch(error => {
+            console.error('Błąd NFO:', error);
+            alert('Wystąpił błąd podczas pobierania pliku NFO: ' + error.message);
+        });
+    
     </script>
 </head>
 <body>
