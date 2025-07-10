@@ -295,32 +295,46 @@ def seriale_list():
 
 @seriale_bp.route("/<int:series_id>")
 def serial_detail(series_id):
-    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
-    if response.status_code != 200:
-        return "Błąd pobierania detali serialu", 500
+    series_info, episodes_raw = get_series_info(series_id)
+    if not series_info:
+        return "Serial nie znaleziony", 404
 
-    data = response.json()
-    serial_info = data.get('info', {})
-    episodes_raw = data.get('episodes', {})
+    episodes_by_season = {}
+    for episode_id, episode_data in episodes_raw.items():
+        season = episode_data['season']
+        if season not in episodes_by_season:
+            episodes_by_season[season] = []
+        episodes_by_season[season].append(episode_data)
+    
+    # Sortuj odcinki w każdym sezonie według numeru odcinka
+    for season in episodes_by_season:
+        episodes_by_season[season].sort(key=lambda x: int(x['episode_num']))
 
-    if isinstance(episodes_raw, str):
-        episodes_raw = json.loads(episodes_raw)
+    # Przygotuj zestaw ID pobranych odcinków dla szybkiego sprawdzania
+    # Upewnij się, że completed_data jest załadowane (powinno być z load_completed() przy starcie aplikacji)
+    completed_episode_ids = {str(item['episode_id']) for item in completed_data if 'episode_id' in item}
 
-    # Sortowanie odcinków według numeru sezonu i odcinka
-    sezony = {}
-    for season_num_str, episode_list in episodes_raw.items():
-        try:
-            season_num = int(season_num_str)
-            sorted_episodes = sorted(episode_list, key=lambda x: int(x.get('episode_num', 0)))
-            sezony[season_num] = sorted_episodes
-        except ValueError:
-            # Obsługa, gdy season_num_str nie jest liczbą (np. 'undefined')
-            continue
+    # Dodaj status do każdego odcinka
+    for season, episodes in episodes_by_season.items():
+        for episode in episodes:
+            episode_id_str = str(episode['episode_id']) # Upewnij się, że ID jest stringiem do porównania
 
-    # Sortowanie sezonów
-    sezony = dict(sorted(sezony.items()))
-    # ... widok bez zmian w logice
-    return render_template("serial_detail.html", serial=data, sezony=sezony, series_id=series_id) # Skrócone dla zwięzłości
+            if episode_id_str in download_status:
+                # Odcinek jest w kolejce lub jest pobierany/zakończył się z błędem
+                episode['status'] = download_status[episode_id_str]
+            elif episode_id_str in completed_episode_ids:
+                # Odcinek został pomyślnie pobrany i zapisany w completed.json
+                episode['status'] = "✅ Pobrano"
+            else:
+                # Odcinek nie był pobierany ani nie został jeszcze pobrany
+                episode['status'] = "" # Lub None, aby nie wyświetlać nic
+            
+            # Opcjonalnie: status "W kolejce" dla zadań, które jeszcze nie zaczęły pobierania
+            # Jeśli chcesz rozróżnić "w kolejce" od "pobierany", musiałbyś zmodyfikować download_status
+            # lub dodać inny sposób śledzenia. Na razie '⏳' oznacza 'w kolejce/pobierany'.
+
+    return render_template("serial_detail.html", series_info=series_info, episodes_by_season=episodes_by_season)
+
 
 
 # --- ZMODYFIKOWANA TRASA POBIERANIA ODCINKA ---
