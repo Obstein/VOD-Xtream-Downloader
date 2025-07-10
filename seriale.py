@@ -366,12 +366,33 @@ def download_episode():
     # Oczyść tytuł odcinka z powtarzających się informacji o serialu i prefiksu "PL -"
         # Użyj regex, aby usunąć "PL - Nazwa Serialu - SXXEYY" z początku tytułu odcinka
         # Upewnij się, że używamy series_name_cleaned, a nie series_folder_name, bo ten drugi zawiera rok
-    cleaned_episode_title = re.sub(r"^[pP][lL]\s*-\s*" + re.escape(series_name_cleaned) + r"\s*-\s*S\d{2}E\d{2}\s*-\s*", "", title, flags=re.IGNORECASE).strip()
-        
-        # Jeśli po czyszczeniu tytuł jest pusty lub zbyt krótki, użyj prostszego domyślnego
-    if not cleaned_episode_title:
-             cleaned_episode_title = f"Odcinek {int(episode_num):02d}"
+    # === KROK 1: Wstępne oczyszczenie tytułu odcinka ===
+        # Usuń popularne prefiksy usług streamingowych (PL, NF, HBO itp.) z początku tytułu
+        # Użyjemy niemająca grupy przechwytującej (?:...)
+    cleaned_episode_title = re.sub(r"^(?:[pP][lL]|[nN][fF]|[hH][bB][oO]|\[\s*[pP][lL]\s*\]|\[\s*[nN][fF]\s*\]|\s*\[\s*\d{4}[pP]\s*\])\s*-\s*", "", title).strip()
 
+        # === KROK 2: Usuń powtarzającą się nazwę serialu i oznaczenie SXXEYY ===
+        # Ta część jest kluczowa dla problemu "NF - Biohackers 4K - S01E06"
+        # Tworzymy wzorzec do usunięcia, który może zawierać nazwę serialu (series_name_cleaned),
+        # opcjonalnie jakość (np. (4K)), i oznaczenie SXXEYY.
+        # Użyjemy re.escape() dla series_name_cleaned, aby zabezpieczyć znaki specjalne regex.
+        # Dodatkowo, obsłużymy inne warianty oznaczeń jakości np. " 4K" bez nawiasów.
+        
+        # Wzorzec do dopasowania np. "Biohackers (4K) - S01E06 - " lub "Biohackers 4K - S01E06 - "
+        # Zaczynamy od potencjalnie oczyszczonej nazwy serialu
+    pattern_to_remove_series_info = r"^(?:" + re.escape(series_name_cleaned) + r"(?:\s*\(\d+K\))?|\s*\d+K)?\s*-\s*S\d{2}E\d{2}\s*[\s-]*"
+    cleaned_episode_title = re.sub(pattern_to_remove_series_info, "", cleaned_episode_title, flags=re.IGNORECASE).strip()
+
+        # === KROK 3: Ostateczne usunięcie pozostałych oznaczeń jakości ===
+        # Usuń wszelkie pozostałe, samodzielne oznaczenia jakości (np. " (4K)", " 1080p") z dowolnego miejsca w tytule
+    cleaned_episode_title = re.sub(r"\s*\(\d+K\)\s*|\s*\d+K\s*|\s*\d{3,4}p\s*", "", cleaned_episode_title, flags=re.IGNORECASE).strip()
+
+        # === KROK 4: Weryfikacja i domyślny tytuł ===
+        # Jeśli po wszystkich czyszczeniach tytuł jest pusty, użyj domyślnego
+    if not cleaned_episode_title:
+            cleaned_episode_title = f"Odcinek {int(episode_num):02d}"
+
+        
     episode_title_sanitized = sanitize_filename(cleaned_episode_title)
     #episode_title_sanitized = sanitize_filename(title)
     # 4. Zbuduj nazwę pliku odcinka: "Nazwa Serialu (Rok) - SXXEYY - Tytuł Odcinka.ext"
@@ -455,11 +476,33 @@ def download_season():
         # Oczyść tytuł odcinka z powtarzających się informacji o serialu i prefiksu "PL -"
         # Użyj regex, aby usunąć "PL - Nazwa Serialu - SXXEYY" z początku tytułu odcinka
         # Upewnij się, że używamy series_name_cleaned, a nie series_folder_name, bo ten drugi zawiera rok
-        cleaned_episode_title = re.sub(r"^[pP][lL]\s*-\s*" + re.escape(series_name_cleaned) + r"\s*-\s*S\d{2}E\d{2}\s*-\s*", "", title, flags=re.IGNORECASE).strip()
+        # === KROK 1: Wstępne oczyszczenie tytułu odcinka ===
+        # Usuń popularne prefiksy usług streamingowych (PL, NF, HBO itp.) z początku tytułu
+        # Użyjemy niemająca grupy przechwytującej (?:...)
+        cleaned_episode_title = re.sub(r"^(?:[pP][lL]|[nN][fF]|[hH][bB][oO]|\[\s*[pP][lL]\s*\]|\[\s*[nN][fF]\s*\]|\s*\[\s*\d{4}[pP]\s*\])\s*-\s*", "", title).strip()
+
+        # === KROK 2: Usuń powtarzającą się nazwę serialu i oznaczenie SXXEYY ===
+        # Ta część jest kluczowa dla problemu "NF - Biohackers 4K - S01E06"
+        # Tworzymy wzorzec do usunięcia, który może zawierać nazwę serialu (series_name_cleaned),
+        # opcjonalnie jakość (np. (4K)), i oznaczenie SXXEYY.
+        # Użyjemy re.escape() dla series_name_cleaned, aby zabezpieczyć znaki specjalne regex.
+        # Dodatkowo, obsłużymy inne warianty oznaczeń jakości np. " 4K" bez nawiasów.
         
-        # Jeśli po czyszczeniu tytuł jest pusty lub zbyt krótki, użyj prostszego domyślnego
+        # Wzorzec do dopasowania np. "Biohackers (4K) - S01E06 - " lub "Biohackers 4K - S01E06 - "
+        # Zaczynamy od potencjalnie oczyszczonej nazwy serialu
+        pattern_to_remove_series_info = r"^(?:" + re.escape(series_name_cleaned) + r"(?:\s*\(\d+K\))?|\s*\d+K)?\s*-\s*S\d{2}E\d{2}\s*[\s-]*"
+        cleaned_episode_title = re.sub(pattern_to_remove_series_info, "", cleaned_episode_title, flags=re.IGNORECASE).strip()
+
+        # === KROK 3: Ostateczne usunięcie pozostałych oznaczeń jakości ===
+        # Usuń wszelkie pozostałe, samodzielne oznaczenia jakości (np. " (4K)", " 1080p") z dowolnego miejsca w tytule
+        cleaned_episode_title = re.sub(r"\s*\(\d+K\)\s*|\s*\d+K\s*|\s*\d{3,4}p\s*", "", cleaned_episode_title, flags=re.IGNORECASE).strip()
+
+        # === KROK 4: Weryfikacja i domyślny tytuł ===
+        # Jeśli po wszystkich czyszczeniach tytuł jest pusty, użyj domyślnego
         if not cleaned_episode_title:
              cleaned_episode_title = f"Odcinek {int(episode_num):02d}"
+
+        
 
         episode_title_sanitized = sanitize_filename(cleaned_episode_title)
         #episode_title_sanitized = sanitize_filename(title)
