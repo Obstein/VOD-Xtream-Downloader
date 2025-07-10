@@ -156,6 +156,7 @@ def save_completed():
         json.dump(completed_data, f, indent=4)
 
 def download_worker():
+    global queue_data
     # Przywracanie z pliku queue_data
     existing_ids_in_queue = {id(job) for job in list(download_queue.queue)}
     for job in queue_data:
@@ -184,7 +185,7 @@ def download_worker():
                 save_completed()
 
             # Usuń zadanie z queue_data po pomyślnym ukończeniu
-            global queue_data
+            #global queue_data
             queue_data = [item for item in queue_data if item['episode_id'] != episode_id]
             save_queue()
 
