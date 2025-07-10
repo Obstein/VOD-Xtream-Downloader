@@ -303,7 +303,7 @@
             <ul>
                 {% for episode in episodes %}
                     <li>
-                        <span class="episode-title">S{{ "%02d"|format(episode.season) }}E{{ "%02d"|format(episode.episode_num) }} - {{ episode.title }}</span>
+                        <span class="episode-title">S{{ "%02d"|format(episode.season) }}E{{ "%02d"|format(episode.episode_num) }} - {{ episode.title }} {% if episode.id | string in completed_data %} ✅ {% endif %}</span>
                         <div class="download-buttons">
                             <button class="download-btn"
                                 onclick="downloadEpisode('{{ episode.id }}', '{{ series_id }}', '{{ episode.season }}', '{{ episode.episode_num }}', '{{ episode.title }}')">
