@@ -87,116 +87,120 @@
 }
     </style>
     <script>
+        window.addEventListener('DOMContentLoaded', function() {
         const queueWidget = document.getElementById('download-queue-widget');
-    const queueHeader = document.getElementById('queue-header');
-    const toggleQueueWidgetBtn = document.getElementById('toggle-queue-widget'); // Przycisk X
-    const toggleQueueBtn = document.getElementById('toggle-queue-btn'); // Pływający przycisk ↓
-    const queueList = document.getElementById('queue-list');
+        const queueHeader = document.getElementById('queue-header');
+        const toggleQueueWidgetBtn = document.getElementById('toggle-queue-widget'); // Przycisk X
+        const toggleQueueBtn = document.getElementById('toggle-queue-btn'); // Pływający przycisk ↓
+        const queueList = document.getElementById('queue-list');
 
-    let isDragging = false;
-    let offsetX, offsetY;
+        let isDragging = false;
+        let offsetX, offsetY;
 
-    // Funkcja do pobierania i aktualizowania kolejki
-    async function updateQueueWidget() {
-        try {
-            const response = await fetch('{{ url_for("seriale.queue_status") }}');
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
+        // Funkcja do pobierania i aktualizowania kolejki
+        async function updateQueueWidget() {
+            try {
+                const response = await fetch('{{ url_for("seriale.queue_status") }}');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const statusData = await response.json();
+                
+                // Pobierz pełną listę zadań z kolejki_data, żeby mieć więcej detali
+                const fullQueueResponse = await fetch('{{ url_for("seriale.get_full_queue") }}');
+                if (!fullQueueResponse.ok) {
+                    throw new Error(`HTTP error! Status: ${fullQueueResponse.status}`);
+                }
+                const fullQueueData = await fullQueueResponse.json();
+
+                queueList.innerHTML = ''; // Wyczyść listę
+                if (fullQueueData.length === 0) {
+                    queueList.innerHTML = '<p style="text-align: center; margin: 10px 0;">Kolejka jest pusta.</p>';
+                } else {
+                    fullQueueData.forEach(job => {
+                        const listItem = document.createElement('li');
+                        const statusChar = statusData[job.episode_id] || '❓'; 
+                        listItem.innerHTML = `
+                            <span>${statusChar} ${job.file}</span>
+                            <button data-episode-id="${job.episode_id}">Usuń</button>
+                        `;
+                        queueList.appendChild(listItem);
+                    });
+                }
+            } catch (error) {
+                console.error('Błąd podczas aktualizacji kolejki:', error);
+                queueList.innerHTML = '<p style="color: red; text-align: center;">Nie udało się załadować kolejki.</p>';
             }
-            const statusData = await response.json();
-            
-            // Pobierz pełną listę zadań z kolejki_data, żeby mieć więcej detali
-            const fullQueueResponse = await fetch('{{ url_for("seriale.get_full_queue") }}'); // Będziemy musieli dodać ten endpoint
-            if (!fullQueueResponse.ok) {
-                throw new Error(`HTTP error! Status: ${fullQueueResponse.status}`);
-            }
-            const fullQueueData = await fullQueueResponse.json();
+        }
 
-            queueList.innerHTML = ''; // Wyczyść listę
-            if (fullQueueData.length === 0) {
-                queueList.innerHTML = '<p style="text-align: center; margin: 10px 0;">Kolejka jest pusta.</p>';
-            } else {
-                fullQueueData.forEach(job => {
-                    const listItem = document.createElement('li');
-                    // Pobierz status dla konkretnego episode_id
-                    const statusChar = statusData[job.episode_id] || '❓'; 
-                    listItem.innerHTML = `
-                        <span>${statusChar} ${job.file}</span>
-                        <button data-episode-id="${job.episode_id}">Usuń</button>
-                    `;
-                    queueList.appendChild(listItem);
+        // Funkcja do usuwania elementu z kolejki
+        async function removeFromQueue(episodeId) {
+            try {
+                const response = await fetch('{{ url_for("seriale.queue_remove") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({ id: episodeId })
                 });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                await updateQueueWidget();
+                alert('Element usunięty z kolejki.');
+            } catch (error) {
+                console.error('Błąd podczas usuwania z kolejki:', error);
+                alert('Wystąpił błąd podczas usuwania elementu z kolejki: ' + error.message);
             }
-        } catch (error) {
-            console.error('Błąd podczas aktualizacji kolejki:', error);
-            queueList.innerHTML = '<p style="color: red; text-align: center;">Nie udało się załadować kolejki.</p>';
         }
-    }
 
-    // Funkcja do usuwania elementu z kolejki
-    async function removeFromQueue(episodeId) {
-        try {
-            const response = await fetch('{{ url_for("seriale.queue_remove") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({ id: episodeId })
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
+        // Delegacja zdarzeń dla przycisków "Usuń"
+        queueList.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON' && event.target.hasAttribute('data-episode-id')) {
+                const episodeId = event.target.getAttribute('data-episode-id');
+                removeFromQueue(episodeId);
             }
-            // Odśwież widżet po usunięciu
-            await updateQueueWidget();
-            alert('Element usunięty z kolejki.');
-        } catch (error) {
-            console.error('Błąd podczas usuwania z kolejki:', error);
-            alert('Wystąpił błąd podczas usuwania elementu z kolejki: ' + error.message);
-        }
-    }
+        });
 
-    // Delegacja zdarzeń dla przycisków "Usuń"
-    queueList.addEventListener('click', (event) => {
-        if (event.target.tagName === 'BUTTON' && event.target.hasAttribute('data-episode-id')) {
-            const episodeId = event.target.getAttribute('data-episode-id');
-            removeFromQueue(episodeId);
-        }
-    });
+        // Przycisk "X" do ukrywania widgetu
+        toggleQueueWidgetBtn.addEventListener('click', () => {
+            queueWidget.style.display = 'none';
+            toggleQueueBtn.style.display = 'flex';
+        });
 
-    // Przycisk "X" do ukrywania widgetu
-    toggleQueueWidgetBtn.addEventListener('click', () => {
+        // Pływający przycisk do pokazywania widgetu
+        toggleQueueBtn.addEventListener('click', () => {
+            queueWidget.style.display = 'flex';
+            toggleQueueBtn.style.display = 'none';
+            updateQueueWidget();
+        });
+
+        // Funkcje do przeciągania widgetu
+        queueHeader.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            offsetX = e.clientX - queueWidget.getBoundingClientRect().left;
+            offsetY = e.clientY - queueWidget.getBoundingClientRect().top;
+            queueWidget.style.cursor = 'grabbing';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            queueWidget.style.left = (e.clientX - offsetX) + 'px';
+            queueWidget.style.top = (e.clientY - offsetY) + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            queueWidget.style.cursor = 'grab';
+        });
+
+        // Ustaw interwał odświeżania kolejki (np. co 5 sekund)
+        setInterval(updateQueueWidget, 5000);
+        
+        // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
         queueWidget.style.display = 'none';
-        toggleQueueBtn.style.display = 'flex'; // Pokaż pływający przycisk
-    });
-
-    // Pływający przycisk do pokazywania widgetu
-    toggleQueueBtn.addEventListener('click', () => {
-        queueWidget.style.display = 'flex';
-        toggleQueueBtn.style.display = 'none'; // Ukryj pływający przycisk
-        updateQueueWidget(); // Odśwież od razu po pokazaniu
-    });
-
-    // Funkcje do przeciągania widgetu
-    queueHeader.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        offsetX = e.clientX - queueWidget.getBoundingClientRect().left;
-        offsetY = e.clientY - queueWidget.getBoundingClientRect().top;
-        queueWidget.style.cursor = 'grabbing';
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        queueWidget.style.left = (e.clientX - offsetX) + 'px';
-        queueWidget.style.top = (e.clientY - offsetY) + 'px';
-    });
-
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-        queueWidget.style.cursor = 'grab';
-    });
-
-    // Ustaw interwał odświeżania kolejki (np. co 5 sekund)
-    setInterval(updateQueueWidget, 5000); // Odświeżaj co 5 sekund
+        toggleQueueBtn.style.display = 'flex';
+    }); // ZAKOŃCZENIE OWIJANIA
     
     // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
     queueWidget.style.display = 'none';
