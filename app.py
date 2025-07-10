@@ -1,99 +1,43 @@
-# Katalog VOD na Unraid - Flask + Docker + Xtream Downloader
+# app.py (zmodyfikowany)
 
 import os
-import requests
-from flask import Flask, render_template_string, request, jsonify
-import subprocess
-from urllib.parse import quote
+from flask import Flask, render_template, redirect, url_for
+
+# Importuj blueprinty
+from seriale import seriale_bp
+from filmy import filmy_bp
+
+# Możesz zaimportować też downloader_core, jeśli potrzebujesz dostępu do jego funkcji tutaj,
+# ale same blueprinty już go importują i używają.
+# from downloader_core import download_worker_thread_start, save_queue, save_completed # itp.
 
 app = Flask(__name__)
 
-# Zmienne środowiskowe
-XTREAM_HOST = os.getenv("XTREAM_HOST")
-XTREAM_PORT = os.getenv("XTREAM_PORT")
-XTREAM_USERNAME = os.getenv("XTREAM_USERNAME")
-XTREAM_PASSWORD = os.getenv("XTREAM_PASSWORD")
-DOWNLOAD_PATH_MOVIES = os.getenv("DOWNLOAD_PATH_MOVIES", "/downloads/Filmy")
-DOWNLOAD_PATH_SERIES = os.getenv("DOWNLOAD_PATH_SERIES", "/downloads/Seriale")
-RETRY_COUNT = int(os.getenv("RETRY_COUNT", 3))
+# Rejestracja blueprintów
+app.register_blueprint(seriale_bp)
+app.register_blueprint(filmy_bp)
 
-XTREAM_API = f"{XTREAM_HOST}:{XTREAM_PORT}/player_api.php?username={XTREAM_USERNAME}&password={XTREAM_PASSWORD}"
-
-# HTML szablon (bardzo uproszczony)
-TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Katalog VOD</title>
-    <style>
-        body { font-family: sans-serif; }
-        .item { margin-bottom: 20px; }
-        button { padding: 5px 10px; }
-    </style>
-</head>
-<body>
-    <h1>Katalog Filmów</h1>
-<nav>
-    <a href="/">Filmy</a> |
-    <a href="/seriale">Seriale</a>
-</nav>
-<hr>
-    {% for movie in movies %}
-        <div class="item">
-            <strong>{{ movie['name'] }}</strong> ({{ movie.get('rating', 'Brak ocen') }})<br>
-            <em>{{ movie.get('genre', 'Brak gatunku') }}</em><br>
-            {{ movie.get('plot', '') }}<br>
-            <button onclick="download('{{ movie['stream_id'] }}', '{{ movie['name'] }}')">Pobierz</button>
-        </div>
-    {% endfor %}
-
-    <script>
-        function download(id, name) {
-            fetch('/download', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: id, name: name })
-            }).then(res => res.json()).then(data => alert(data.message))
-        }
-    </script>
-</body>
-</html>
-"""
-
+# Trasa główna przekierowuje na listę seriali
 @app.route("/")
 def index():
-    response = requests.get(f"{XTREAM_API}&action=get_vod_streams")
-    movies = response.json()
-    return render_template_string(TEMPLATE, movies=movies)
+    return redirect(url_for('seriale.seriale_list')) # Domyślnie przekieruj na seriale
 
-@app.route("/download", methods=["POST"])
-def download():
-    data = request.get_json()
-    stream_id = data['id']
-    name = data['name']
-    stream_url = f"{XTREAM_HOST}:{XTREAM_PORT}/movie/{XTREAM_USERNAME}/{XTREAM_PASSWORD}/{stream_id}.mp4"
+# Możesz dodać osobne linki do filmów i seriali w menu nawigacyjnym w HTML.
+# Na przykład, jeśli chcesz mieć /filmy jako osobną stronę główną dla filmów.
+# @app.route("/filmy_glowna")
+# def filmy_glowna():
+#     return redirect(url_for('filmy.filmy_list'))
 
-    sanitized_name = quote(name.replace(' ', '_'))
-    dest_path = os.path.join(DOWNLOAD_PATH_MOVIES, f"{sanitized_name}.mp4")
+if __name__ == '__main__':
+    # Upewnij się, że wszystkie zmienne środowiskowe są ustawione,
+    # np. w pliku .env lub bezpośrednio w środowisku.
+    # FLASK_APP=app.py
+    # FLASK_ENV=development
+    # XTREAM_HOST=twoj_host
+    # XTREAM_PORT=twoj_port
+    # XTREAM_USERNAME=twoj_login
+    # XTREAM_PASSWORD=twoje_haslo
+    # DOWNLOAD_PATH_SERIES=/sciezka/do/seriali
+    # DOWNLOAD_PATH_MOVIES=/sciezka/do/filmow
 
-    success = False
-    for attempt in range(RETRY_COUNT):
-        try:
-            subprocess.run(["wget", "-O", dest_path, stream_url], check=True)
-            success = True
-            break
-        except subprocess.CalledProcessError:
-            continue
-
-    if success:
-        return jsonify({"message": f"Pobrano: {name}"})
-    else:
-        return jsonify({"message": f"Nieudane pobieranie: {name}"}), 500
-
-from seriale import seriale_bp
-app.register_blueprint(seriale_bp)
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
-
-
+    app.run(host='0.0.0.0', port=5000, debug=True)

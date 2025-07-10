@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista Filmów</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .search-form { text-align: center; margin-bottom: 20px; }
+        .search-form input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 60%;
+            max-width: 400px;
+            margin-right: 10px;
+        }
+        .search-form button {
+            padding: 8px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .search-form button:hover {
+            background-color: #0056b3;
+        }
+        .movies-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .movie-item {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            text-align: center;
+            padding-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .movie-item img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .movie-item h2 {
+            font-size: 1.1em;
+            margin: 0;
+            padding: 5px 0;
+            flex-grow: 1; /* Pozwala na rozciągnięcie tytułu */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 0 5px;
+        }
+        .movie-item h2 a {
+            text-decoration: none;
+            color: #333; /* Zmieniono kolor na ciemniejszy dla lepszej czytelności */
+            font-weight: bold;
+            display: block;
+            width: 100%;
+        }
+        .movie-item h2 a:hover {
+            text-decoration: underline;
+        }
+        .download-btn, .nfo-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 5px; /* Dodano margines */
+        }
+        .nfo-btn { background-color: #007bff; }
+        .download-btn:hover, .nfo-btn:hover { opacity: 0.9; }
+
+        /* Style dla znaczka pobrania */
+        .downloaded-icon {
+            color: green;
+            margin-left: 5px;
+            font-size: 1.2em;
+            vertical-align: middle;
+        }
+
+        /* Styles for the queue widget (same as in serial_detail.html) */
+        #download-queue-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            max-height: 400px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: flex; /* Changed to flex */
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #download-queue-widget button {
+            border: none;
+            background-color: #dc3545; /* Red for remove button */
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 0.8em;
+        }
+
+        #download-queue-widget button:hover {
+            background-color: #c82333;
+        }
+
+        #queue-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        #queue-list li:last-child {
+            border-bottom: none;
+        }
+
+        #toggle-queue-btn { /* Floating button to show/hide widget */
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 1.5em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 999;
+        }
+
+        #toggle-queue-btn:hover {
+            background-color: #218838;
+        }
+    </style>
+    <script>
+        function downloadMovie(id, name) {
+            fetch('{{ url_for("filmy.download_movie") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'id': id,
+                    'name': name
+                })
+            })
+            .then(response => response.text()) // Get text response to read potential messages
+            .then(message => {
+                alert(message); // Display message from backend
+                updateQueueWidget(); // Refresh queue status
+            })
+            .catch(error => {
+                console.error('Błąd:', error);
+                alert('Wystąpił błąd sieci podczas pobierania filmu.');
+            });
+        }
+
+        function downloadMovieNFO(movieId) {
+            const url = `/filmy/nfo/${movieId}`;
+            fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => { throw new Error(text) });
+                }
+                return response.text();
+            })
+            .then(data => {
+                alert(data);
+            })
+            .catch(error => {
+                console.error('Błąd NFO:', error);
+                alert('Wystąpił błąd podczas pobierania pliku NFO: ' + error.message);
+            });
+        }
+
+
+        // Funkcje widgetu kolejki - skopiowane z serial_detail.html
+        window.addEventListener('DOMContentLoaded', function() {
+            const queueWidget = document.getElementById('download-queue-widget');
+            const queueHeader = document.getElementById('queue-header');
+            const toggleQueueWidgetBtn = document.getElementById('toggle-queue-widget'); // Przycisk X
+            const toggleQueueBtn = document.getElementById('toggle-queue-btn'); // Pływający przycisk ↓
+            const queueList = document.getElementById('queue-list');
+
+            let isDragging = false;
+            let offsetX, offsetY;
+
+            // Funkcja do pobierania i aktualizowania kolejki
+            window.updateQueueWidget = async function() { // Uczyń globalną
+                try {
+                    const statusResponse = await fetch('{{ url_for("filmy.queue_status") }}'); // Zmieniono na blueprint filmów
+                    if (!statusResponse.ok) {
+                        throw new Error(`HTTP error! Status: ${statusResponse.status}`);
+                    }
+                    const statusData = await statusResponse.json();
+                    
+                    const fullQueueResponse = await fetch('{{ url_for("filmy.get_full_queue") }}'); // Zmieniono na blueprint filmów
+                    if (!fullQueueResponse.ok) {
+                        throw new Error(`HTTP error! Status: ${fullQueueResponse.status}`);
+                    }
+                    const fullQueueData = await fullQueueResponse.json();
+
+                    queueList.innerHTML = ''; // Wyczyść listę
+                    if (fullQueueData.length === 0) {
+                        queueList.innerHTML = '<p style="text-align: center; margin: 10px 0;">Kolejka jest pusta.</p>';
+                    } else {
+                        fullQueueData.forEach(job => {
+                            const listItem = document.createElement('li');
+                            // Użyj job.item_id
+                            const statusChar = statusData[job.item_id] || '❓';
+                            listItem.innerHTML = `
+                                <span>${statusChar} ${job.file}</span>
+                                <button data-item-id="${job.item_id}">Usuń</button>
+                            `;
+                            queueList.appendChild(listItem);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Błąd podczas aktualizacji kolejki:', error);
+                    queueList.innerHTML = '<p style="color: red; text-align: center;">Nie udało się załadować kolejki.</p>';
+                }
+            }
+
+            // Funkcja do usuwania elementu z kolejki
+            async function removeFromQueue(itemId) { // Zmieniono na itemId
+                try {
+                    const response = await fetch('{{ url_for("filmy.queue_remove") }}', { // Zmieniono na blueprint filmów
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({ id: itemId }) // Zmieniono na id
+                    });
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    await updateQueueWidget();
+                    alert('Element usunięty z kolejki.');
+                } catch (error) {
+                    console.error('Błąd podczas usuwania z kolejki:', error);
+                    alert('Wystąpił błąd podczas usuwania elementu z kolejki: ' + error.message);
+                }
+            }
+
+            // Delegacja zdarzeń dla przycisków "Usuń"
+            queueList.addEventListener('click', (event) => {
+                if (event.target.tagName === 'BUTTON' && event.target.hasAttribute('data-item-id')) {
+                    const itemId = event.target.getAttribute('data-item-id'); // Zmieniono na itemId
+                    removeFromQueue(itemId);
+                }
+            });
+
+            // Przycisk "X" do ukrywania widgetu
+            toggleQueueWidgetBtn.addEventListener('click', () => {
+                queueWidget.style.display = 'none';
+                toggleQueueBtn.style.display = 'flex';
+            });
+
+            // Pływający przycisk do pokazywania widgetu
+            toggleQueueBtn.addEventListener('click', () => {
+                queueWidget.style.display = 'flex';
+                toggleQueueBtn.style.display = 'none';
+                updateQueueWidget();
+            });
+
+            // Funkcje do przeciągania widgetu
+            queueHeader.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                offsetX = e.clientX - queueWidget.getBoundingClientRect().left;
+                offsetY = e.clientY - queueWidget.getBoundingClientRect().top;
+                queueWidget.style.cursor = 'grabbing';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                queueWidget.style.left = (e.clientX - offsetX) + 'px';
+                queueWidget.style.top = (e.clientY - offsetY) + 'px';
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                queueWidget.style.cursor = 'grab';
+            });
+
+            // Ustaw interwał odświeżania kolejki (np. co 5 sekund)
+            setInterval(updateQueueWidget, 5000);
+            
+            // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
+            queueWidget.style.display = 'none';
+            toggleQueueBtn.style.display = 'flex';
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Dostępne Filmy</h1>
+
+        <nav style="text-align: center; margin-bottom: 20px;">
+            <a href="{{ url_for('seriale.seriale_list') }}" style="margin-right: 20px; font-weight: bold; text-decoration: none; color: #007bff;">Seriale</a>
+            <a href="{{ url_for('filmy.filmy_list') }}" style="font-weight: bold; text-decoration: underline; color: #007bff;">Filmy</a>
+        </nav>
+
+        <form class="search-form" action="{{ url_for('filmy.filmy_list') }}" method="get">
+            <input type="text" name="query" placeholder="Szukaj filmu..." value="{{ request.args.get('query', '') }}">
+            <button type="submit">Szukaj</button>
+        </form>
+
+        <div class="movies-grid">
+            {% for movie in movies %}
+            <div class="movie-item">
+                {% if movie.stream_icon %}
+                    <img src="{{ movie.stream_icon }}" alt="{{ movie.name }} cover">
+                {% endif %}
+                <h2>
+                    <a href="#">{{ movie.name }}</a>
+                    {% if movie.stream_id | string in completed_data %}
+                        <span class="downloaded-icon">✅</span>
+                    {% endif %}
+                </h2>
+                <button class="download-btn"
+                    onclick="downloadMovie('{{ movie.stream_id }}', '{{ movie.name }}')">
+                    Pobierz
+                </button>
+                <button class="nfo-btn"
+                    onclick="downloadMovieNFO('{{ movie.stream_id }}')">
+                    NFO
+                </button>
+            </div>
+            {% endfor %}
+            {% if not movies %}
+            <p style="grid-column: 1 / -1; text-align: center;">Brak filmów spełniających kryteria wyszukiwania.</p>
+            {% endif %}
+        </div>
+        <p style="text-align: center; margin-top: 20px;"><a href="{{ url_for('filmy.completed_movies') }}">Pobrane Filmy (i Seriale)</a></p>
+    </div>
+
+    <div id="download-queue-widget" style="
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 300px;
+        max-height: 400px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1000;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+    ">
+        <div style="
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: move;
+        " id="queue-header">
+            <span>Kolejka pobierania</span>
+            <button id="toggle-queue-widget" style="
+                background: none;
+                border: none;
+                color: white;
+                font-size: 1.2em;
+                cursor: pointer;
+                padding: 0 5px;
+            ">✕</button>
+        </div>
+        <div id="queue-content" style="
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-size: 0.9em;
+            color: #343a40;
+        ">
+            <p style="text-align: center; margin: 10px 0;"></p>
+            <ul id="queue-list" style="list-style: none; padding: 0; margin: 0;">
+            </ul>
+        </div>
+    </div>
+    <button id="toggle-queue-btn">↓</button>
+</body>
+</html>
