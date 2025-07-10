@@ -260,13 +260,32 @@ def queue_reorder():
 def completed_episodes():
     return jsonify(completed_data)
 
+# --- Widoki i reszta tras (zmiana w seriale_list) ---
 @seriale_bp.route("/")
 def seriale_list():
+    # Pobierz parametr 'query' z zapytania URL, domyślnie pusty ciąg
+    # Konwertuj na małe litery, aby wyszukiwanie było niewrażliwe na wielkość liter
+    query = request.args.get('query', '').lower() 
+
     response = requests.get(f"{BASE_API}&action=get_series")
     if response.status_code != 200:
         return "Błąd pobierania listy seriali", 500
-    # ... reszta widoku bez zmian
-    return render_template("seriale_list.html", seriale=response.json())
+    
+    all_seriale = response.json()
+    
+    # Jeśli podano zapytanie, filtruj seriale
+    if query:
+        filtered_seriale = []
+        for serial in all_seriale:
+            # Sprawdź, czy nazwa serialu istnieje i czy zawiera zapytanie (niewrażliwe na wielkość liter)
+            if serial.get('name') and query in serial['name'].lower():
+                filtered_seriale.append(serial)
+        seriale_to_display = filtered_seriale
+    else:
+        # Jeśli brak zapytania, wyświetl wszystkie seriale
+        seriale_to_display = all_seriale
+
+    return render_template("seriale_list.html", seriale=seriale_to_display)
 
 @seriale_bp.route("/<int:series_id>")
 def serial_detail(series_id):
