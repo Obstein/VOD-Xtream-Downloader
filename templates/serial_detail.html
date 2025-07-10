@@ -124,7 +124,7 @@
             <ul>
                 {% for episode in episodes %}
                     <li>
-                        <span class="episode-title">S{{ episode.season|string.zfill(2) }}E{{ episode.episode_num|string.zfill(2) }} - {{ episode.title }}</span>
+                        <span class="episode-title">S{{ "%02d"|format(episode.season) }}E{{ "%02d"|format(episode.episode_num) }} - {{ episode.title }}</span>
                         <div class="download-buttons">
                             <button class="download-btn"
                                 onclick="downloadEpisode('{{ episode.id }}', '{{ series_id }}', '{{ episode.season }}', '{{ episode.episode_num }}', '{{ episode.title }}')">
