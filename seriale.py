@@ -366,13 +366,13 @@ def download_episode():
     # Oczyść tytuł odcinka z powtarzających się informacji o serialu i prefiksu "PL -"
         # Użyj regex, aby usunąć "PL - Nazwa Serialu - SXXEYY" z początku tytułu odcinka
         # Upewnij się, że używamy series_name_cleaned, a nie series_folder_name, bo ten drugi zawiera rok
-        cleaned_episode_title = re.sub(r"^[pP][lL]\s*-\s*" + re.escape(series_name_cleaned) + r"\s*-\s*S\d{2}E\d{2}\s*-\s*", "", title, flags=re.IGNORECASE).strip()
+    cleaned_episode_title = re.sub(r"^[pP][lL]\s*-\s*" + re.escape(series_name_cleaned) + r"\s*-\s*S\d{2}E\d{2}\s*-\s*", "", title, flags=re.IGNORECASE).strip()
         
         # Jeśli po czyszczeniu tytuł jest pusty lub zbyt krótki, użyj prostszego domyślnego
-        if not cleaned_episode_title:
+    if not cleaned_episode_title:
              cleaned_episode_title = f"Odcinek {int(episode_num):02d}"
 
-        episode_title_sanitized = sanitize_filename(cleaned_episode_title)
+    episode_title_sanitized = sanitize_filename(cleaned_episode_title)
     #episode_title_sanitized = sanitize_filename(title)
     # 4. Zbuduj nazwę pliku odcinka: "Nazwa Serialu (Rok) - SXXEYY - Tytuł Odcinka.ext"
     file_name = f"{series_folder_name} - S{int(season):02d}E{int(episode_num):02d} - {episode_title_sanitized}.{ext}"
