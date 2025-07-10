@@ -266,6 +266,57 @@ def get_full_queue():
     # Zwracamy pełną listę zadań w kolejce
     return jsonify(queue_data)
 
+# --- Funkcja do pobierania informacji o serialu i odcinkach ---
+def get_series_info(series_id):
+    """
+    Pobiera szczegółowe informacje o serialu i jego odcinkach z API.
+    Zwraca (series_info, episodes_raw) lub (None, None) w przypadku błędu.
+    """
+    
+    # Pobierz szczegóły serialu
+    series_info_url = f"{BASE_API}&action=get_series_info&series_id={series_id}"
+    series_info = None
+    try:
+        response_info = requests.get(series_info_url)
+        response_info.raise_for_status() # Wyrzuca wyjątek dla błędów HTTP (4xx lub 5xx)
+        series_info_data = response_info.json()
+        if 'info' in series_info_data:
+            series_info = series_info_data['info']
+        else:
+            # Niektóre API mogą zwracać info bezpośrednio, a nie w zagnieżdżonym 'info'
+            # To jest przypadek dla argontv.ru, gdzie info jest na głównym poziomie,
+            # a odcinki są w 'episodes'.
+            series_info = series_info_data 
+            
+    except (requests.exceptions.RequestException, ValueError, KeyError) as e:
+        print(f"Błąd pobierania informacji o serialu {series_id} z URL {series_info_url}: {e}")
+        return None, None # Zwróć None, jeśli nie można pobrać informacji o serialu
+
+    # Pobierz odcinki dla serialu
+    episodes_url = f"{BASE_API}&action=get_series_episodes&series_id={series_id}"
+    episodes_raw = {}
+    try:
+        response_episodes = requests.get(episodes_url)
+        response_episodes.raise_for_status()
+        episodes_data = response_episodes.json()
+        if 'episodes' in episodes_data:
+            # API zwraca odcinki pod kluczem 'episodes'
+            # Struktura 'episodes' to często słownik, gdzie kluczami są numery sezonów,
+            # a wartościami listy odcinków w danym sezonie.
+            episodes_raw = episodes_data['episodes']
+        else:
+            # Jeśli API zwraca odcinki bezpośrednio jako słownik {episode_id: data}
+            # lub inną strukturę, może być konieczna adaptacja.
+            # Przyjmujemy, że API zwraca słownik sezonów, a w nich listę odcinków
+            episodes_raw = episodes_data 
+
+    except (requests.exceptions.RequestException, ValueError, KeyError) as e:
+        print(f"Błąd pobierania odcinków dla serialu {series_id} z URL {episodes_url}: {e}")
+        # Nawet jeśli odcinki się nie załadują, zwróć informacje o serialu, jeśli są dostępne
+        return series_info, {} # Zwróć pusty słownik dla odcinków, jeśli nie można ich pobrać
+
+    return series_info, episodes_raw
+
 # --- Widoki i reszta tras (zmiana w seriale_list) ---
 @seriale_bp.route("/")
 def seriale_list():
