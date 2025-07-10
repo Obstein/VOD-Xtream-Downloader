@@ -363,8 +363,17 @@ def download_episode():
 
     path = os.path.join(DOWNLOAD_PATH_SERIES, series_folder_name, f"Season {int(season):02d}")
     os.makedirs(path, exist_ok=True)
+    # Oczyść tytuł odcinka z powtarzających się informacji o serialu i prefiksu "PL -"
+        # Użyj regex, aby usunąć "PL - Nazwa Serialu - SXXEYY" z początku tytułu odcinka
+        # Upewnij się, że używamy series_name_cleaned, a nie series_folder_name, bo ten drugi zawiera rok
+        cleaned_episode_title = re.sub(r"^[pP][lL]\s*-\s*" + re.escape(series_name_cleaned) + r"\s*-\s*S\d{2}E\d{2}\s*-\s*", "", title, flags=re.IGNORECASE).strip()
+        
+        # Jeśli po czyszczeniu tytuł jest pusty lub zbyt krótki, użyj prostszego domyślnego
+        if not cleaned_episode_title:
+             cleaned_episode_title = f"Odcinek {int(episode_num):02d}"
 
-    episode_title_sanitized = sanitize_filename(title)
+        episode_title_sanitized = sanitize_filename(cleaned_episode_title)
+    #episode_title_sanitized = sanitize_filename(title)
     # 4. Zbuduj nazwę pliku odcinka: "Nazwa Serialu (Rok) - SXXEYY - Tytuł Odcinka.ext"
     file_name = f"{series_folder_name} - S{int(season):02d}E{int(episode_num):02d} - {episode_title_sanitized}.{ext}"
     file_path = os.path.join(path, file_name)
@@ -443,7 +452,17 @@ def download_season():
 
         path = os.path.join(DOWNLOAD_PATH_SERIES, series_folder_name, f"Season {int(season):02d}")
         os.makedirs(path, exist_ok=True)
-        episode_title_sanitized = sanitize_filename(title)
+        # Oczyść tytuł odcinka z powtarzających się informacji o serialu i prefiksu "PL -"
+        # Użyj regex, aby usunąć "PL - Nazwa Serialu - SXXEYY" z początku tytułu odcinka
+        # Upewnij się, że używamy series_name_cleaned, a nie series_folder_name, bo ten drugi zawiera rok
+        cleaned_episode_title = re.sub(r"^[pP][lL]\s*-\s*" + re.escape(series_name_cleaned) + r"\s*-\s*S\d{2}E\d{2}\s*-\s*", "", title, flags=re.IGNORECASE).strip()
+        
+        # Jeśli po czyszczeniu tytuł jest pusty lub zbyt krótki, użyj prostszego domyślnego
+        if not cleaned_episode_title:
+             cleaned_episode_title = f"Odcinek {int(episode_num):02d}"
+
+        episode_title_sanitized = sanitize_filename(cleaned_episode_title)
+        #episode_title_sanitized = sanitize_filename(title)
         # 4. Zbuduj nazwę pliku odcinka: "Nazwa Serialu (Rok) - SXXEYY - Tytuł Odcinka.ext"
         file_name = f"{series_folder_name} - S{int(season):02d}E{int(episode_num):02d} - {episode_title_sanitized}.{ext}"
         file_path = os.path.join(path, file_name)
