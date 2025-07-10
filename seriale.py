@@ -272,7 +272,7 @@ def serial_detail(series_id):
     # Sortowanie sezonów
     sezony = dict(sorted(sezony.items()))
     # ... widok bez zmian w logice
-    return render_template("seriale_detail.html", serial=data, sezony=sezony, series_id=series_id) # Skrócone dla zwięzłości
+    return render_template("serial_detail.html", serial=data, sezony=sezony, series_id=series_id) # Skrócone dla zwięzłości
 
 
 # --- ZMODYFIKOWANA TRASA POBIERANIA ODCINKA ---
