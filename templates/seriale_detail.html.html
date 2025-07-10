@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ serial.info.name }}</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        h2 { color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px; }
+        .season-container { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 15px; }
+        .season-box { border: 1px solid #ddd; border-radius: 5px; padding: 10px; width: 120px; text-align: center; background-color: #f9f9f9; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .season-box a { text-decoration: none; color: #007bff; font-weight: bold; display: block; }
+        .season-box a:hover { text-decoration: underline; }
+        ul { list-style: none; padding: 0; }
+        li { background: #e9e9e9; margin-bottom: 5px; padding: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .episode-title { flex-grow: 1; }
+        .download-buttons { display: flex; gap: 5px; }
+        .download-btn, .nfo-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .nfo-btn { background-color: #007bff; }
+        .download-btn:hover, .nfo-btn:hover { opacity: 0.9; }
+        .back-link { display: block; text-align: center; margin-top: 20px; }
+    </style>
+    <script>
+        function downloadEpisode(episodeId, seriesId, season, episodeNum, title) {
+            fetch('{{ url_for("seriale.download_episode") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'id': episodeId,
+                    'series_id': seriesId,
+                    'season': season,
+                    'episode_num': episodeNum,
+                    'title': title
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Odcinek dodany do kolejki!');
+                } else {
+                    alert('Błąd podczas dodawania odcinka do kolejki.');
+                }
+            })
+            .catch(error => {
+                console.error('Błąd:', error);
+                alert('Wystąpił błąd sieci.');
+            });
+        }
+
+        function downloadSeason(seriesId, season) {
+            if (confirm('Czy na pewno chcesz pobrać cały sezon ' + season + '?')) {
+                fetch('{{ url_for("seriale.download_season") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        'series_id': seriesId,
+                        'season': season
+                    })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Sezon dodany do kolejki!');
+                    } else {
+                        alert('Błąd podczas dodawania sezonu do kolejki.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Błąd:', error);
+                    alert('Wystąpił błąd sieci.');
+                });
+            }
+        }
+
+        function downloadNFO(seriesId, season, episodeNum) {
+            fetch('{{ url_for("seriale.download_nfo", series_id=series_id, season=season, episode=episodeNum) }}')
+            .then(response => response.text())
+            .then(data => {
+                alert(data);
+            })
+            .catch(error => {
+                console.error('Błąd NFO:', error);
+                alert('Błąd pobierania pliku NFO.');
+            });
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ serial.info.name }}</h1>
+        {% if serial.info.cover %}
+            <p><img src="{{ serial.info.cover }}" alt="{{ serial.info.name }} cover" style="max-width: 200px; display: block; margin: 0 auto;"></p>
+        {% endif %}
+        <p><strong>Rok:</strong> {{ serial.info.releaseDate }}</p>
+        <p><strong>Gatunki:</strong> {{ serial.info.genres }}</p>
+        <p><strong>Opis:</strong> {{ serial.info.plot }}</p>
+
+        <h2>Sezony:</h2>
+        <div class="season-container">
+            {% for numer_sezonu, episodes in sezony.items() %}
+                <div class="season-box">
+                    <a href="#season-{{ numer_sezonu }}">Sezon {{ numer_sezonu }}</a>
+                    <button onclick="downloadSeason('{{ series_id }}', {{ numer_sezonu }})" class="download-btn">Pobierz Sezon</button>
+                </div>
+            {% endfor %}
+        </div>
+
+        {% for numer_sezonu, episodes in sezony.items() %}
+            <h2 id="season-{{ numer_sezonu }}">Sezon {{ numer_sezonu }}</h2>
+            <ul>
+                {% for episode in episodes %}
+                    <li>
+                        <span class="episode-title">S{{ episode.season|string.zfill(2) }}E{{ episode.episode_num|string.zfill(2) }} - {{ episode.title }}</span>
+                        <div class="download-buttons">
+                            <button class="download-btn"
+                                onclick="downloadEpisode('{{ episode.id }}', '{{ series_id }}', '{{ episode.season }}', '{{ episode.episode_num }}', '{{ episode.title }}')">
+                                Pobierz
+                            </button>
+                            <button class="nfo-btn"
+                                onclick="downloadNFO('{{ series_id }}', {{ episode.season }}, {{ episode.episode_num }})">
+                                NFO
+                            </button>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endfor %}
+        <p class="back-link"><a href="{{ url_for('seriale.seriale_list') }}">← Powrót do listy seriali</a></p>
+        <p style="text-align: center;"><a href="{{ url_for('seriale.queue_status') }}">Status kolejki</a></p>
+        <p style="text-align: center;"><a href="{{ url_for('seriale.completed_episodes') }}">Pobrane odcinki</a></p>
+    </div>
+</body>
+</html>

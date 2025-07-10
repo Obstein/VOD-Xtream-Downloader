@@ -243,12 +243,36 @@ def seriale_list():
     if response.status_code != 200:
         return "Błąd pobierania listy seriali", 500
     # ... reszta widoku bez zmian
-    return render_template_string("...", seriale=response.json()) # Skrócone dla zwięzłości
+    return render_template("seriale_list.html", seriale=response.json())
 
 @seriale_bp.route("/<int:series_id>")
 def serial_detail(series_id):
+    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+    if response.status_code != 200:
+        return "Błąd pobierania detali serialu", 500
+
+    data = response.json()
+    serial_info = data.get('info', {})
+    episodes_raw = data.get('episodes', {})
+
+    if isinstance(episodes_raw, str):
+        episodes_raw = json.loads(episodes_raw)
+
+    # Sortowanie odcinków według numeru sezonu i odcinka
+    sezony = {}
+    for season_num_str, episode_list in episodes_raw.items():
+        try:
+            season_num = int(season_num_str)
+            sorted_episodes = sorted(episode_list, key=lambda x: int(x.get('episode_num', 0)))
+            sezony[season_num] = sorted_episodes
+        except ValueError:
+            # Obsługa, gdy season_num_str nie jest liczbą (np. 'undefined')
+            continue
+
+    # Sortowanie sezonów
+    sezony = dict(sorted(sezony.items()))
     # ... widok bez zmian w logice
-    return render_template_string("...", serial=serial, sezony=sezony, series_id=series_id) # Skrócone dla zwięzłości
+    return render_template("serial_detail.html", serial=data, sezony=sezony, series_id=series_id) # Skrócone dla zwięzłości
 
 
 # --- ZMODYFIKOWANA TRASA POBIERANIA ODCINKA ---

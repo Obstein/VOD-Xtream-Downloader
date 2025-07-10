@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista Seriali</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .series-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
+        .series-item { border: 1px solid #ddd; border-radius: 5px; padding: 10px; text-align: center; background-color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .series-item img { max-width: 100%; height: auto; border-radius: 3px; margin-bottom: 10px; }
+        .series-item h2 { font-size: 1.1em; margin: 0; padding: 5px 0; }
+        .series-item a { text-decoration: none; color: #007bff; font-weight: bold; }
+        .series-item a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dostępne Seriale</h1>
+        <div class="series-grid">
+            {% for serial in seriale %}
+            <div class="series-item">
+                {% if serial.cover %}
+                    <img src="{{ serial.cover }}" alt="{{ serial.name }} cover">
+                {% endif %}
+                <h2><a href="{{ url_for('seriale.serial_detail', series_id=serial.series_id) }}">{{ serial.name }}</a></h2>
+            </div>
+            {% endfor %}
+        </div>
+        <p style="text-align: center; margin-top: 20px;"><a href="{{ url_for('seriale.queue_status') }}">Status kolejki</a></p>
+        <p style="text-align: center;"><a href="{{ url_for('seriale.completed_episodes') }}">Pobrane odcinki</a></p>
+    </div>
+</body>
+</html>
