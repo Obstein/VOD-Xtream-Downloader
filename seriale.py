@@ -1,23 +1,4 @@
-Jasne, oto zmodyfikowana wersja Twojego pliku `seriale.py`. Wprowadzone zmiany mają na celu ujednolicenie i dostosowanie struktury folderów oraz nazw plików do standardów rozpoznawanych przez Plex, co znacząco ułatwi automatyczne pobieranie metadanych i okładek.
 
-### Główne zmiany:
-
-1.  **Dodano funkcję `sanitize_filename`**: Służy do usuwania niedozwolonych znaków z nazw plików i folderów, co zapobiega błędom w różnych systemach operacyjnych.
-2.  **Ujednolicona struktura**: Wszystkie funkcje tworzące pliki (`download_episode`, `download_season`, `download_nfo`) korzystają teraz z tego samego schematu nazewnictwa.
-3.  **Format nazw zgodny z Plex**:
-      * **Folder serialu**: `Nazwa Serialu (Rok)` (np. `The Office (2005)`)
-      * **Folder sezonu**: `Season XX` (np. `Season 01`)
-      * **Nazwa pliku**: `Nazwa Serialu (Rok) - SXXEXX - Tytuł Odcinka.ext` (np. `The Office (2005) - S01E01 - Pilot.mp4`)
-4.  **Pobieranie roku produkcji**: Rok jest automatycznie pobierany z pola `releaseDate` z API i dodawany do nazw, co jest kluczowe dla prawidłowej identyfikacji serialu.
-5.  **Czyszczenie kodu**: Usunięto zbędne operacje na nazwach plików, takie jak `quote()` i zamiana spacji na `_`, ponieważ nie są już potrzebne.
-
------
-
-### Zmodyfikowany kod `seriale.py`
-
-Poniżej znajduje się pełna, gotowa do użycia wersja Twojego skryptu. Wystarczy, że podmienisz zawartość swojego pliku `seriale.py` na poniższą.
-
-```python
 from flask import Blueprint, request, jsonify, render_template_string, send_file
 import os
 import requests
