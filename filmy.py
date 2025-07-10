@@ -189,6 +189,7 @@ def filmy_list():
 def download_movie():
     stream_id = request.form.get('id')
     name_raw = request.form.get('name')
+    ext = request.form.get('ext') 
 
     if not all([stream_id, name_raw]):
         return "Błąd: Brak wymaganych danych do pobrania filmu.", 400

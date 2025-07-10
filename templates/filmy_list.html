@@ -165,7 +165,7 @@
         }
     </style>
     <script>
-        function downloadMovie(id, name) {
+        function downloadMovie(id, name, ext) {
             fetch('{{ url_for("filmy.download_movie") }}', {
                 method: 'POST',
                 headers: {
@@ -173,7 +173,8 @@
                 },
                 body: new URLSearchParams({
                     'id': id,
-                    'name': name
+                    'name': name,
+                    'ext': ext 
                 })
             })
             .then(response => response.text()) // Get text response to read potential messages
@@ -350,7 +351,7 @@
                     {% endif %}
                 </h2>
                 <button class="download-btn"
-                    onclick="downloadMovie('{{ movie.stream_id }}', '{{ movie.name }}')">
+                    onclick="downloadMovie('{{ movie.stream_id }}', '{{ movie.name }}', '{{ movie.container_extension }}')">
                     Pobierz
                 </button>
                 <button class="nfo-btn"
