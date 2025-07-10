@@ -3,348 +3,373 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ series_info.name }} - Szczegóły Serialu</title>
+    <title>{{ serial.info.name }}</title>
     <style>
         body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; }
         .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1, h2 { color: #333; text-align: center; }
-        .series-info { text-align: center; margin-bottom: 20px; }
-        .series-info img { max-width: 200px; height: auto; border-radius: 8px; margin-bottom: 10px; }
-        .season-list { margin-top: 30px; }
-        .episode-list { list-style: none; padding: 0; }
-        .episode-list li {
-            background-color: #f8f8f8;
-            border: 1px solid #eee;
-            margin-bottom: 5px;
-            padding: 10px 15px;
-            border-radius: 5px;
-            display: flex; /* Użyj flexboxa dla lepszego ułożenia */
-            justify-content: space-between; /* Rozłóż elementy na końcach */
-            align-items: center; /* Wyśrodkuj pionowo */
-        }
-        .episode-list li span.episode-title { /* Styl dla tytułu odcinka */
-            flex-grow: 1; /* Pozwól tytułowi zajmować dostępną przestrzeń */
-            margin-right: 10px;
-        }
-        .episode-list li .download-buttons button, .episode-list li .download-buttons a {
-            padding: 5px 10px;
-            background-color: #007bff;
+        h1 { color: #333; text-align: center; }
+        h2 { color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px; }
+        .season-container { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 15px; }
+        .season-box { border: 1px solid #ddd; border-radius: 5px; padding: 10px; width: 120px; text-align: center; background-color: #f9f9f9; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .season-box a { text-decoration: none; color: #007bff; font-weight: bold; display: block; }
+        .season-box a:hover { text-decoration: underline; }
+        ul { list-style: none; padding: 0; }
+        li { background: #e9e9e9; margin-bottom: 5px; padding: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .episode-title { flex-grow: 1; }
+        .download-buttons { display: flex; gap: 5px; }
+        .download-btn, .nfo-btn {
+            background-color: #28a745;
             color: white;
             border: none;
+            padding: 6px 10px;
             border-radius: 4px;
             cursor: pointer;
-            margin-left: 5px;
+            font-size: 0.85em;
             text-decoration: none;
-            font-size: 0.9em;
+            display: inline-block;
         }
-        .episode-list li .download-buttons button:hover, .episode-list li .download-buttons a:hover {
-            background-color: #0056b3;
-        }
-        .episode-status {
-            font-weight: bold;
-            margin-right: 10px; /* Dodaj odstęp od przycisków */
-            color: #28a745; /* Zielony dla pobranego */
-        }
-        /* Style dla różnych statusów */
-        .episode-status[data-status="⏳"] { color: #ffc107; } /* Żółty dla w trakcie/oczekującego */
-        .episode-status[data-status="❌"] { color: #dc3545; } /* Czerwony dla błędu */
-        .episode-status[data-status="✅ Pobrano"] { color: #28a745; } /* Zielony dla pobranego */
+        .nfo-btn { background-color: #007bff; }
+        .download-btn:hover, .nfo-btn:hover { opacity: 0.9; }
+        .back-link { display: block; text-align: center; margin-top: 20px; }
+        /* Dodaj do istniejącego bloku <style> */
+#download-queue-widget button {
+    border: none;
+    background-color: #dc3545; /* Kolor czerwony dla przycisku usuwania */
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 10px;
+    font-size: 0.8em;
+}
 
-        /* Pływająca ramka kolejki (skopiuj z seriale_list.html) */
-        #download-queue-widget {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 300px;
-            max-height: 400px;
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 1000;
-            display: none; /* Domyślnie ukryte */
-            flex-direction: column;
-            overflow: hidden;
+#download-queue-widget button:hover {
+    background-color: #c82333;
+}
+
+#queue-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+#queue-list li:last-child {
+    border-bottom: none;
+}
+
+/* Dodatkowe style dla ukrywania/pokazywania widgetu */
+#toggle-queue-btn { /* Przycisk, który pokaże widget */
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #28a745; /* Zielony kolor */
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.5em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 999;
+}
+
+#toggle-queue-btn:hover {
+    background-color: #218838;
+}
+    </style>
+    <script>
+        function downloadEpisode(episodeId, seriesId, season, episodeNum, title) {
+            fetch('{{ url_for("seriale.download_episode") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'id': episodeId,
+                    'series_id': seriesId,
+                    'season': season,
+                    'episode_num': episodeNum,
+                    'title': title
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Odcinek dodany do kolejki!');
+                } else {
+                    alert('Błąd podczas dodawania odcinka do kolejki.');
+                }
+            })
+            .catch(error => {
+                console.error('Błąd:', error);
+                alert('Wystąpił błąd sieci.');
+            });
         }
-        #queue-header {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 15px;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: move;
+
+        function downloadSeason(seriesId, season) {
+            if (confirm('Czy na pewno chcesz pobrać cały sezon ' + season + '?')) {
+                fetch('{{ url_for("seriale.download_season") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        'series_id': seriesId,
+                        'season': season
+                    })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Sezon dodany do kolejki!');
+                    } else {
+                        alert('Błąd podczas dodawania sezonu do kolejki.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Błąd:', error);
+                    alert('Wystąpił błąd sieci.');
+                });
+            }
         }
-        #toggle-queue-widget {
+
+        function downloadNFO(seriesId, season, episodeNum) {
+        // Budujemy URL dynamicznie w JavaScript
+        const url = `/seriale/nfo/${seriesId}/${season}/${episodeNum}`;
+        
+        fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                // Jeśli odpowiedź nie jest OK (np. 404, 500), rzuć błąd
+                return response.text().then(text => { throw new Error(text) });
+            }
+            return response.text();
+        })
+        .then(data => {
+            alert(data); // Wyświetl odpowiedź z serwera
+        })
+        .catch(error => {
+            console.error('Błąd NFO:', error);
+            alert('Wystąpił błąd podczas pobierania pliku NFO: ' + error.message);
+        });
+        }
+
+        window.addEventListener('DOMContentLoaded', function() {
+        const queueWidget = document.getElementById('download-queue-widget');
+        const queueHeader = document.getElementById('queue-header');
+        const toggleQueueWidgetBtn = document.getElementById('toggle-queue-widget'); // Przycisk X
+        const toggleQueueBtn = document.getElementById('toggle-queue-btn'); // Pływający przycisk ↓
+        const queueList = document.getElementById('queue-list');
+
+        let isDragging = false;
+        let offsetX, offsetY;
+
+        // Funkcja do pobierania i aktualizowania kolejki
+        async function updateQueueWidget() {
+            try {
+                const response = await fetch('{{ url_for("seriale.queue_status") }}');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const statusData = await response.json();
+                
+                // Pobierz pełną listę zadań z kolejki_data, żeby mieć więcej detali
+                const fullQueueResponse = await fetch('{{ url_for("seriale.get_full_queue") }}');
+                if (!fullQueueResponse.ok) {
+                    throw new Error(`HTTP error! Status: ${fullQueueResponse.status}`);
+                }
+                const fullQueueData = await fullQueueResponse.json();
+
+                queueList.innerHTML = ''; // Wyczyść listę
+                if (fullQueueData.length === 0) {
+                    queueList.innerHTML = '<p style="text-align: center; margin: 10px 0;">Kolejka jest pusta.</p>';
+                } else {
+                    fullQueueData.forEach(job => {
+                        const listItem = document.createElement('li');
+                        const statusChar = statusData[job.episode_id] || '❓'; 
+                        listItem.innerHTML = `
+                            <span>${statusChar} ${job.file}</span>
+                            <button data-episode-id="${job.episode_id}">Usuń</button>
+                        `;
+                        queueList.appendChild(listItem);
+                    });
+                }
+            } catch (error) {
+                console.error('Błąd podczas aktualizacji kolejki:', error);
+                queueList.innerHTML = '<p style="color: red; text-align: center;">Nie udało się załadować kolejki.</p>';
+            }
+        }
+
+        // Funkcja do usuwania elementu z kolejki
+        async function removeFromQueue(episodeId) {
+            try {
+                const response = await fetch('{{ url_for("seriale.queue_remove") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({ id: episodeId })
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                await updateQueueWidget();
+                alert('Element usunięty z kolejki.');
+            } catch (error) {
+                console.error('Błąd podczas usuwania z kolejki:', error);
+                alert('Wystąpił błąd podczas usuwania elementu z kolejki: ' + error.message);
+            }
+        }
+
+        // Delegacja zdarzeń dla przycisków "Usuń"
+        queueList.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON' && event.target.hasAttribute('data-episode-id')) {
+                const episodeId = event.target.getAttribute('data-episode-id');
+                removeFromQueue(episodeId);
+            }
+        });
+
+        // Przycisk "X" do ukrywania widgetu
+        toggleQueueWidgetBtn.addEventListener('click', () => {
+            queueWidget.style.display = 'none';
+            toggleQueueBtn.style.display = 'flex';
+        });
+
+        // Pływający przycisk do pokazywania widgetu
+        toggleQueueBtn.addEventListener('click', () => {
+            queueWidget.style.display = 'flex';
+            toggleQueueBtn.style.display = 'none';
+            updateQueueWidget();
+        });
+
+        // Funkcje do przeciągania widgetu
+        queueHeader.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            offsetX = e.clientX - queueWidget.getBoundingClientRect().left;
+            offsetY = e.clientY - queueWidget.getBoundingClientRect().top;
+            queueWidget.style.cursor = 'grabbing';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            queueWidget.style.left = (e.clientX - offsetX) + 'px';
+            queueWidget.style.top = (e.clientY - offsetY) + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            queueWidget.style.cursor = 'grab';
+        });
+
+        // Ustaw interwał odświeżania kolejki (np. co 5 sekund)
+        setInterval(updateQueueWidget, 5000);
+        
+        // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
+        queueWidget.style.display = 'none';
+        toggleQueueBtn.style.display = 'flex';
+    }); // ZAKOŃCZENIE OWIJANIA
+    
+    // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
+    queueWidget.style.display = 'none';
+    toggleQueueBtn.style.display = 'flex';
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ serial.info.name }}</h1>
+        {% if serial.info.cover %}
+            <p><img src="{{ serial.info.cover }}" alt="{{ serial.info.name }} cover" style="max-width: 200px; display: block; margin: 0 auto;"></p>
+        {% endif %}
+        <p><strong>Rok:</strong> {{ serial.info.releaseDate }}</p>
+        <p><strong>Gatunki:</strong> {{ serial.info.genres }}</p>
+        <p><strong>Opis:</strong> {{ serial.info.plot }}</p>
+
+        <h2>Sezony:</h2>
+        <div class="season-container">
+            {% for numer_sezonu, episodes in sezony.items() %}
+                <div class="season-box">
+                    <a href="#season-{{ numer_sezonu }}">Sezon {{ numer_sezonu }}</a>
+                    <button onclick="downloadSeason('{{ series_id }}', {{ numer_sezonu }})" class="download-btn">Pobierz Sezon</button>
+                </div>
+            {% endfor %}
+        </div>
+
+        {% for numer_sezonu, episodes in sezony.items() %}
+            <h2 id="season-{{ numer_sezonu }}">Sezon {{ numer_sezonu }}</h2>
+            <ul>
+                {% for episode in episodes %}
+                    <li>
+                        <span class="episode-title">S{{ "%02d"|format(episode.season) }}E{{ "%02d"|format(episode.episode_num) }} - {{ episode.title }}</span>
+                        <div class="download-buttons">
+                            <button class="download-btn"
+                                onclick="downloadEpisode('{{ episode.id }}', '{{ series_id }}', '{{ episode.season }}', '{{ episode.episode_num }}', '{{ episode.title }}')">
+                                Pobierz
+                            </button>
+                            <button class="nfo-btn"
+                                onclick="downloadNFO('{{ series_id }}', {{ episode.season }}, {{ episode.episode_num }})">
+                                NFO
+                            </button>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endfor %}
+        <p class="back-link"><a href="{{ url_for('seriale.seriale_list') }}">← Powrót do listy seriali</a></p>
+        <p style="text-align: center;"><a href="{{ url_for('seriale.queue_status') }}">Status kolejki</a></p>
+        <p style="text-align: center;"><a href="{{ url_for('seriale.completed_episodes') }}">Pobrane odcinki</a></p>
+    </div>
+    <div id="download-queue-widget" style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 300px;
+    max-height: 400px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    display: none; /* Domyślnie ukryte */
+    flex-direction: column;
+    overflow: hidden;
+">
+    <div style="
+        background-color: #007bff;
+        color: white;
+        padding: 10px 15px;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: move; /* Do przeciągania */
+    " id="queue-header">
+        <span>Kolejka pobierania</span>
+        <button id="toggle-queue-widget" style="
             background: none;
             border: none;
             color: white;
             font-size: 1.2em;
             cursor: pointer;
             padding: 0 5px;
-        }
-        #queue-content {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 10px;
-            font-size: 0.9em;
-            color: #343a40;
-        }
-        #download-queue-widget button {
-            border: none;
-            background-color: #dc3545;
-            color: white;
-            padding: 3px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-left: 10px;
-            font-size: 0.8em;
-        }
-        #download-queue-widget button:hover {
-            background-color: #c82333;
-        }
-        #queue-list { list-style: none; padding: 0; margin: 0; }
-        #queue-list li {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 5px 0;
-            border-bottom: 1px solid #e9ecef;
-        }
-        #queue-list li:last-child { border-bottom: none; }
-        #toggle-queue-btn {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            font-size: 1.5em;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            z-index: 999;
-        }
-        #toggle-queue-btn:hover { background-color: #218838; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>{{ series_info.name }}</h1>
-        <div class="series-info">
-            {# Jeśli chcesz mieć okładkę serialu na stronie szczegółów, możesz tutaj użyć proxy_image #}
-            {# {% if series_info.cover %}
-                <img src="{{ url_for('seriale.proxy_image', url=series_info.cover|urlencode) }}" alt="{{ series_info.name }} cover">
-            {% endif %} #}
-            <p>{{ series_info.plot }}</p>
-        </div>
-
-        <div class="season-list">
-            {% for season_num in episodes_by_season|sort %}
-            <h2>Sezon {{ season_num }}</h2>
-            <ul class="episode-list">
-                {% for episode in episodes_by_season[season_num] %}
-                <li>
-                    <span class="episode-title">
-                        {{ episode.episode_num }}. {{ episode.title }}
-                    </span>
-                    <div class="download-buttons">
-                        {% if episode.status %}
-                            {# Dodajemy atrybut data-status dla stylizacji CSS #}
-                            <span class="episode-status" data-status="{{ episode.status }}">[{{ episode.status }}]</span>
-                        {% endif %}
-                        <button onclick="downloadEpisode('{{ series_info.series_id }}', '{{ season_num }}', '{{ episode.episode_id }}', '{{ episode.title | e }}', '{{ episode.ext }}')">Pobierz Odcinek</button>
-                    </div>
-                </li>
-                {% endfor %}
-            </ul>
-            {% endfor %}
-        </div>
-        <p style="text-align: center; margin-top: 20px;"><a href="{{ url_for('seriale.seriale_list') }}">Powrót do listy seriali</a></p>
+        ">✕</button>
     </div>
-
-    <div id="download-queue-widget" style="
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        width: 300px;
-        max-height: 400px;
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 1000;
-        display: none;
-        flex-direction: column;
-        overflow: hidden;
+    <div id="queue-content" style="
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 10px;
+        font-size: 0.9em;
+        color: #343a40;
     ">
-        <div style="
-            background-color: #007bff;
-            color: white;
-            padding: 10px 15px;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: move;
-        " id="queue-header">
-            <span>Kolejka pobierania</span>
-            <button id="toggle-queue-widget" style="
-                background: none;
-                border: none;
-                color: white;
-                font-size: 1.2em;
-                cursor: pointer;
-                padding: 0 5px;
-            ">✕</button>
-        </div>
-        <div id="queue-content" style="
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 10px;
-            font-size: 0.9em;
-            color: #343a40;
-        ">
-            <p style="text-align: center; margin: 10px 0;">Ładowanie kolejki...</p>
-            <ul id="queue-list" style="list-style: none; padding: 0; margin: 0;">
-                </ul>
-        </div>
+        <p style="text-align: center; margin: 10px 0;">Ładowanie kolejki...</p>
+        <ul id="queue-list" style="list-style: none; padding: 0; margin: 0;">
+            </ul>
     </div>
-    <button id="toggle-queue-btn">↓</button>
-
-    <script>
-        // Funkcja do pobierania pojedynczego odcinka
-        async function downloadEpisode(seriesId, seasonNum, episodeId, episodeTitle, ext) {
-            const seriesFolderName = encodeURIComponent(document.querySelector('h1').innerText.split('(')[0].trim());
-            const episodeTitleSanitized = encodeURIComponent(episodeTitle);
-            const url = `{{ url_for('seriale.download_episode') }}?series_id=${seriesId}&season=${seasonNum}&episode_id=${episodeId}&series_folder_name=${seriesFolderName}&episode_title=${episodeTitleSanitized}&ext=${ext}`;
-            try {
-                const response = await fetch(url, { method: 'POST' });
-                const result = await response.text();
-                alert(result);
-                // Po dodaniu do kolejki, odśwież widok, aby pokazać status
-                if (response.ok) {
-                    // Możesz tu wywołać updateQueueWidget() jeśli chcesz natychmiast odświeżyć status
-                    // lub po prostu odświeżyć całą stronę, aby pobrać nowy status
-                    location.reload(); 
-                }
-            } catch (error) {
-                console.error('Błąd:', error);
-                alert('Wystąpił błąd podczas dodawania do kolejki: ' + error.message);
-            }
-        }
-
-        // ... (Twój kod JavaScript dla pływającego widżetu kolejki - skopiuj z seriale_list.html) ...
-        // Pamiętaj, aby opakować go w DOMContentLoaded jak poprzednio!
-
-        window.addEventListener('DOMContentLoaded', function() {
-            const queueWidget = document.getElementById('download-queue-widget');
-            const queueHeader = document.getElementById('queue-header');
-            const toggleQueueWidgetBtn = document.getElementById('toggle-queue-widget');
-            const toggleQueueBtn = document.getElementById('toggle-queue-btn');
-            const queueList = document.getElementById('queue-list');
-
-            let isDragging = false;
-            let offsetX, offsetY;
-
-            async function updateQueueWidget() {
-                try {
-                    const statusResponse = await fetch('{{ url_for("seriale.queue_status") }}');
-                    const statusData = await statusResponse.json();
-                    
-                    const fullQueueResponse = await fetch('{{ url_for("seriale.get_full_queue") }}');
-                    const fullQueueData = await fullQueueResponse.json();
-
-                    queueList.innerHTML = '';
-                    if (fullQueueData.length === 0) {
-                        queueList.innerHTML = '<p style="text-align: center; margin: 10px 0;">Kolejka jest pusta.</p>';
-                    } else {
-                        fullQueueData.forEach(job => {
-                            const listItem = document.createElement('li');
-                            const statusChar = statusData[job.episode_id] || '❓';
-                            listItem.innerHTML = `
-                                <span>${statusChar} ${job.file}</span>
-                                <button data-episode-id="${job.episode_id}">Usuń</button>
-                            `;
-                            queueList.appendChild(listItem);
-                        });
-                    }
-                } catch (error) {
-                    console.error('Błąd podczas aktualizacji kolejki:', error);
-                    queueList.innerHTML = '<p style="color: red; text-align: center;">Nie udało się załadować kolejki.</p>';
-                }
-            }
-
-            async function removeFromQueue(episodeId) {
-                try {
-                    const response = await fetch('{{ url_for("seriale.queue_remove") }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: new URLSearchParams({ id: episodeId })
-                    });
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    await updateQueueWidget();
-                    alert('Element usunięty z kolejki.');
-                    location.reload(); // Odśwież stronę po usunięciu, aby zaktualizować status odcinka
-                } catch (error) {
-                    console.error('Błąd podczas usuwania z kolejki:', error);
-                    alert('Wystąpił błąd podczas usuwania elementu z kolejki: ' + error.message);
-                }
-            }
-
-            queueList.addEventListener('click', (event) => {
-                if (event.target.tagName === 'BUTTON' && event.target.hasAttribute('data-episode-id')) {
-                    const episodeId = event.target.getAttribute('data-episode-id');
-                    removeFromQueue(episodeId);
-                }
-            });
-
-            toggleQueueWidgetBtn.addEventListener('click', () => {
-                queueWidget.style.display = 'none';
-                toggleQueueBtn.style.display = 'flex';
-            });
-
-            toggleQueueBtn.addEventListener('click', () => {
-                queueWidget.style.display = 'flex';
-                toggleQueueBtn.style.display = 'none';
-                updateQueueWidget();
-            });
-
-            queueHeader.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                offsetX = e.clientX - queueWidget.getBoundingClientRect().left;
-                offsetY = e.clientY - queueWidget.getBoundingClientRect().top;
-                queueWidget.style.cursor = 'grabbing';
-            });
-
-            document.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-                queueWidget.style.left = (e.clientX - offsetX) + 'px';
-                queueWidget.style.top = (e.clientY - offsetY) + 'px';
-            });
-
-            document.addEventListener('mouseup', () => {
-                isDragging = false;
-                queueWidget.style.cursor = 'grab';
-            });
-
-            setInterval(updateQueueWidget, 5000);
-            
-            queueWidget.style.display = 'none';
-            toggleQueueBtn.style.display = 'flex';
-        });
-    </script>
+</div>
+<button id="toggle-queue-btn">↓</button>
 </body>
 </html>
