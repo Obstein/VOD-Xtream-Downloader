@@ -390,7 +390,13 @@ def serial_detail(series_id):
                 episode['status'] = "✅ Pobrano"
             else:
                 episode['status'] = "" 
-            
+    # ... (pozostała część funkcji serial_detail w seriale.py) ...
+
+    # Dodaj poniższe linie w funkcji serial_detail, tuż przed render_template
+    print(f"DEBUG: series_info: {series_info}")
+    print(f"DEBUG: episodes_raw (po get_series_info): {episodes_raw}")
+    print(f"DEBUG: episodes_by_season (po przetworzeniu): {episodes_by_season}")
+        
     return render_template("serial_detail.html", series_info=series_info, episodes_by_season=episodes_by_season)
 
 
