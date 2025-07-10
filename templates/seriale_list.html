@@ -211,6 +211,11 @@
     <div class="container">
         <h1>Dostępne Seriale</h1>
 
+        <nav style="text-align: center; margin-bottom: 20px;">
+            <a href="{{ url_for('seriale.seriale_list') }}" style="margin-right: 20px; font-weight: bold; text-decoration: none; color: #007bff;">Seriale</a>
+            <a href="{{ url_for('filmy.filmy_list') }}" style="font-weight: bold; text-decoration: underline; color: #007bff;">Filmy</a>
+        </nav>
+
         <form class="search-form" action="{{ url_for('seriale.seriale_list') }}" method="get">
             <input type="text" name="query" placeholder="Szukaj serialu..." value="{{ request.args.get('query', '') }}">
             <button type="submit">Szukaj</button>

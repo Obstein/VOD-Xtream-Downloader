@@ -24,9 +24,9 @@ def index():
 
 # Możesz dodać osobne linki do filmów i seriali w menu nawigacyjnym w HTML.
 # Na przykład, jeśli chcesz mieć /filmy jako osobną stronę główną dla filmów.
-@app.route("/filmy_glowna")
-def filmy_glowna():
-    return redirect(url_for('filmy.filmy_list'))
+# @app.route("/filmy_glowna")
+# def filmy_glowna():
+#     return redirect(url_for('filmy.filmy_list'))
 
 if __name__ == '__main__':
     # Upewnij się, że wszystkie zmienne środowiskowe są ustawione,
