@@ -344,60 +344,74 @@ def seriale_list():
 
     return render_template("seriale_list.html", seriale=seriale_to_display)
 
+
+
 @seriale_bp.route("/<int:series_id>")
 def serial_detail(series_id):
+    # Krok 1: Pobierz wszystkie dane o serialu i odcinkach za pomocą jednej funkcji
     series_info, episodes_raw = get_series_info(series_id)
+    
     if not series_info:
-        return "Serial nie znaleziony", 404
+        # Jeśli series_info jest None, oznacza to błąd pobierania danych lub serial nie znaleziony
+        return "Serial nie znaleziony lub błąd pobierania danych.", 404
 
     episodes_by_season = {}
     
-    # === KLUCZOWA ZMIANA TUTAJ: Iterujemy przez sezony, a potem przez odcinki w każdym sezonie ===
-    # episodes_raw powinno być słownikiem, np. {"1": [ep1_data, ep2_data], "2": [ep3_data]}
+    # Krok 2: Przetwórz episodes_raw do struktury episodes_by_season
+    # episodes_raw powinno być słownikiem, gdzie kluczami są numery sezonów (np. "1", "2"),
+    # a wartościami są listy słowników reprezentujących odcinki w danym sezonie.
     for season_num_str, episodes_list_for_season in episodes_raw.items():
         try:
-            season_num = int(season_num_str) # Konwertuj numer sezonu na int dla sortowania
+            season_num = int(season_num_str)
         except ValueError:
             print(f"Ostrzeżenie: Nieprawidłowy numer sezonu '{season_num_str}' dla serialu {series_id}. Pomijam.")
             continue # Pomiń ten sezon, jeśli numer jest nieprawidłowy
 
         episodes_by_season[season_num] = []
         
+        # Iteruj przez każdy odcinek w liście odcinków dla bieżącego sezonu
         for episode_data in episodes_list_for_season:
-            # Sprawdź, czy 'id' i 'episode_num' istnieją w danych odcinka
-            if 'id' in episode_data and 'episode_num' in episode_data:
+            # Upewnij się, że dane odcinka zawierają niezbędne klucze
+            if 'id' in episode_data and 'episode_num' in episode_data and 'title' in episode_data:
                 episodes_by_season[season_num].append(episode_data)
             else:
-                print(f"Ostrzeżenie: Brak klucza 'id' lub 'episode_num' w danych odcinka: {episode_data}")
+                print(f"Ostrzeżenie: Brak klucza 'id', 'episode_num' lub 'title' w danych odcinka: {episode_data}")
 
-    # Sortuj odcinki w każdym sezonie według numeru odcinka
+    # Krok 3: Sortuj odcinki w każdym sezonie według numeru odcinka
     for season in episodes_by_season:
-        episodes_by_season[season].sort(key=lambda x: int(x['episode_num']))
+        # Użyj .get('episode_num', 0) dla bezpieczeństwa, aby uniknąć błędów,
+        # gdyby episode_num był brakujący lub None.
+        episodes_by_season[season].sort(key=lambda x: int(x.get('episode_num', 0)))
 
-    # Przygotuj zestaw ID pobranych odcinków dla szybkiego sprawdzania
-    # Upewnij się, że completed_data jest załadowane
+    # Krok 4: Przygotuj zestaw ID pobranych odcinków dla szybkiego sprawdzania statusu
+    # Upewnij się, że `completed_data` jest załadowane (powinno być ładowane globalnie przy starcie aplikacji)
     completed_episode_ids = {str(item['episode_id']) for item in completed_data if 'episode_id' in item}
 
-    # Dodaj status do każdego odcinka
+    # Krok 5: Dodaj status pobierania do każdego odcinka
     for season, episodes in episodes_by_season.items():
         for episode in episodes:
-            # Użyj 'id' jako klucza ID odcinka z API
+            # Użyj 'id' z danych odcinka jako głównego identyfikatora
             episode_id_str = str(episode['id']) 
 
             if episode_id_str in download_status:
+                # Odcinek jest w kolejce lub jest pobierany/zakończył się z błędem
                 episode['status'] = download_status[episode_id_str]
             elif episode_id_str in completed_episode_ids:
+                # Odcinek został pomyślnie pobrany i zapisany w completed.json
                 episode['status'] = "✅ Pobrano"
             else:
+                # Odcinek nie był pobierany ani nie został jeszcze pobrany
                 episode['status'] = "" 
-    # ... (pozostała część funkcji serial_detail w seriale.py) ...
-
-    # Dodaj poniższe linie w funkcji serial_detail, tuż przed render_template
+            
+    # Krok 6: Wydrukuj dane debugujące (zostaw je na razie, abyś mógł sprawdzić konsolę)
     print(f"DEBUG: series_info: {series_info}")
-    print(f"DEBUG: episodes_raw (po get_series_info): {episodes_raw}")
-    print(f"DEBUG: episodes_by_season (po przetworzeniu): {episodes_by_season}")
-        
+    print(f"DEBUG: episodes_raw (z get_series_info): {episodes_raw}")
+    print(f"DEBUG: episodes_by_season (ostateczna przetworzona struktura): {episodes_by_season}")
+
+    # Krok 7: Renderuj szablon z poprawnie przygotowanymi danymi
     return render_template("serial_detail.html", series_info=series_info, episodes_by_season=episodes_by_season)
+
+
 
 
 
