@@ -44,7 +44,11 @@ else:
 # --- NOWA FUNKCJA POMOCNICZA ---
 def sanitize_filename(name):
     """Usuwa nieprawidłowe znaki z nazwy pliku/folderu, aby zapewnić kompatybilność."""
-    return re.sub(r'[<>:"/\\|?*]', '', name).strip()
+    s = re.sub(r'[^\w\s\-\._()]', '', name) # Usuwa nieprawidłowe znaki
+    s = re.sub(r'\s+', ' ', s).strip() # Zastępuje wielokrotne spacje pojedynczą i usuwa białe znaki na końcach
+    return s
+
+
 
 # --- Funkcje TMDB (bez zmian) ---
 from functools import lru_cache
@@ -80,27 +84,44 @@ def get_tmdb_episode_metadata(tmdb_id, season, episode):
 # --- ZMODYFIKOWANA TRASA NFO ---
 @seriale_bp.route("/nfo/<int:series_id>/<int:season>/<int:episode>")
 def download_nfo(series_id, season, episode):
-    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
-    if response.status_code != 200:
-        return "Błąd pobierania danych serialu", 500
-    info = response.json()
-    series_info = info.get('info', {})
+    try:
+        response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+        response.raise_for_status() # Sprawdza, czy zapytanie zakończyło się sukcesem
+        info = response.json()
+    except requests.exceptions.RequestException as e:
+        return f"Błąd komunikacji z API: {e}", 500
+    except ValueError: # Błąd dekodowania JSON
+        return "Błąd: Nieprawidłowa odpowiedź JSON z API.", 500
 
-    # Logika do tworzenia nazwy serialu z rokiem (zgodnie z Plex)
+    series_info = info.get('info', {})
     series_name_raw = series_info.get('name', f"serial_{series_id}")
+
+    # === LOGIKA NAZEWNICTWA PLEXA DLA FOLDERU SERIALU ===
+    # 1. Usuń prefiks "PL - " z nazwy serialu
+    series_name_cleaned = re.sub(r"^[pP][lL]\s*-\s*", "", series_name_raw).strip()
+    
+    # 2. Wydobądź rok z 'releaseDate'
     release_date_str = series_info.get('releaseDate', '')
-    year = ''
+    year_str = ''
     if release_date_str:
         try:
-            year = f"({datetime.strptime(release_date_str, '%Y-%m-%d').year})"
+            year_str = f"({datetime.strptime(release_date_str, '%Y-%m-%d').year})"
         except ValueError:
+            # Jeśli format daty jest inny, spróbuj pobrać pierwsze 4 cyfry
             if release_date_str.strip()[:4].isdigit():
-                 year = f"({release_date_str.strip()[:4]})"
-    series_folder_name = sanitize_filename(f"{series_name_raw} {year}".strip())
+                 year_str = f"({release_date_str.strip()[:4]})"
+    
+    # 3. Zbuduj nazwę folderu serialu: "Nazwa Serialu (Rok)"
+    series_folder_name = sanitize_filename(f"{series_name_cleaned} {year_str}".strip())
+    # ====================================================
 
     episodes_raw = info.get('episodes', {})
     if isinstance(episodes_raw, str):
-        episodes_raw = json.loads(episodes_raw)
+        try:
+            episodes_raw = json.loads(episodes_raw)
+        except json.JSONDecodeError:
+            return "Błąd: Nieprawidłowy format JSON odcinków z API.", 500
+            
     found_ep = None
     for sezon_lista in episodes_raw.values():
         for ep in sezon_lista:
@@ -114,9 +135,10 @@ def download_nfo(series_id, season, episode):
 
     ep_title = sanitize_filename(found_ep.get('title', f"Odcinek {episode}"))
     
-    tmdb_id = search_tmdb_series_id(series_name_raw)
+    # Przekazujemy series_name_cleaned do search_tmdb_series_id dla lepszych wyników
+    tmdb_id = search_tmdb_series_id(series_name_cleaned)
     if not tmdb_id:
-        return f"Nie znaleziono TMDB ID dla: {series_name_raw}", 404
+        return f"Nie znaleziono TMDB ID dla: {series_name_cleaned}", 404
     metadata = get_tmdb_episode_metadata(tmdb_id, season, episode)
     if not metadata:
         return "Brak metadanych", 404
@@ -131,9 +153,10 @@ def download_nfo(series_id, season, episode):
   <thumb>{'https://image.tmdb.org/t/p/original' + metadata['still_path'] if metadata.get('still_path') else ''}</thumb>
 </episodedetails>
 """
-    # Tworzenie ścieżki i nazwy pliku .nfo zgodnej z plikiem wideo
+    # Tworzenie ścieżki i nazwy pliku .nfo zgodnej z plikiem wideo dla Plexa
     path = os.path.join(DOWNLOAD_PATH_SERIES, series_folder_name, f"Season {season:02d}")
     os.makedirs(path, exist_ok=True)
+    # Nazwa pliku NFO: "Nazwa Serialu (Rok) - SXXEYY - Tytuł Odcinka.nfo"
     file_name_nfo = f"{series_folder_name} - S{season:02d}E{episode:02d} - {ep_title}.nfo"
     file_path = os.path.join(path, file_name_nfo)
 
@@ -278,50 +301,71 @@ def serial_detail(series_id):
 # --- ZMODYFIKOWANA TRASA POBIERANIA ODCINKA ---
 @seriale_bp.route("/download/episode", methods=["POST"])
 def download_episode():
-    form_data = request.form
-    series_id = form_data['series_id'].strip()
-    episode_id = form_data['id']
-    season = form_data['season']
-    title = form_data['title']
-    episode_num = form_data.get('episode_num', '1')
+    episode_id = request.form.get("id")
+    series_id = request.form.get("series_id")
+    season = request.form.get("season")
+    episode_num = request.form.get("episode_num")
+    title = request.form.get("title")
 
-    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
-    if response.status_code != 200:
-        return "Błąd pobierania metadanych", 500
+    if not all([episode_id, series_id, season, episode_num, title]):
+        return "Błąd: Brak wymaganych danych do pobrania odcinka.", 400
 
-    data = response.json()
-    series_info = data.get('info', {})
-    episodes_raw = data.get("episodes", {})
-    if isinstance(episodes_raw, str):
-        episodes_raw = json.loads(episodes_raw)
-
-    found_ep = None
-    for sezon_lista in episodes_raw.values():
-        for ep in sezon_lista:
-            if str(ep['id']) == episode_id:
-                found_ep = ep
-                break
-        if found_ep: break
-    if not found_ep:
-        return "❌ Nie znaleziono odcinka", 404
-
-    # Nowa logika tworzenia nazw i ścieżek dla Plex
-    series_name_raw = series_info.get('name', f"serial_{series_id}")
-    release_date_str = series_info.get('releaseDate', '')
-    year = ''
-    if release_date_str:
-        try:
-            year = f"({datetime.strptime(release_date_str, '%Y-%m-%d').year})"
-        except ValueError:
-            if release_date_str.strip()[:4].isdigit():
-                 year = f"({release_date_str.strip()[:4]})"
+    try:
+        response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.RequestException as e:
+        return f"Błąd komunikacji z API: {e}", 500
+    except ValueError:
+        return "Błąd: Nieprawidłowa odpowiedź JSON z API.", 500
     
-    series_folder_name = sanitize_filename(f"{series_name_raw} {year}".strip())
+    series_info = data.get('info', {})
+    episodes_raw = data.get('episodes', {})
+
+    current_episode_info = None
+    if isinstance(episodes_raw, str):
+        try:
+            episodes_raw = json.loads(episodes_raw)
+        except json.JSONDecodeError:
+            return "Błąd: Nieprawidłowy format JSON odcinków z API.", 500
+    
+    for season_data in episodes_raw.values():
+        for ep in season_data:
+            if str(ep.get('id')) == str(episode_id):
+                current_episode_info = ep
+                break
+        if current_episode_info:
+            break
+
+    if not current_episode_info:
+        return f"Błąd: Nie znaleziono informacji o odcinku {episode_id}", 404
+
+    ext = current_episode_info.get("container_extension", "mp4") # Domyślne rozszerzenie
+    
+    # === LOGIKA NAZEWNICTWA PLEXA DLA FOLDERU SERIALU I PLIKU ODCINKA ===
+    # 1. Usuń prefiks "PL - " z nazwy serialu
+    series_name_raw = series_info.get("name", "")
+    series_name_cleaned = re.sub(r"^[pP][lL]\s*-\s*", "", series_name_raw).strip()
+
+    # 2. Wydobądź rok z 'releaseDate'
+    release_year_str = series_info.get("releaseDate", "").split('-')[0] if series_info.get("releaseDate") else ""
+
+    # 3. Zbuduj nazwę folderu serialu: "Nazwa Serialu (Rok)"
+    if release_year_str:
+        series_folder_name = sanitize_filename(f"{series_name_cleaned} ({release_year_str})")
+    else:
+        series_folder_name = sanitize_filename(series_name_cleaned)
+    # ===================================================================
+
+    if episode_id in completed_data:
+        print(f"Odcinek {title} (ID: {episode_id}) już pobrany, pomijam.")
+        return "Odcinek już pobrany", 200
+
     path = os.path.join(DOWNLOAD_PATH_SERIES, series_folder_name, f"Season {int(season):02d}")
     os.makedirs(path, exist_ok=True)
 
-    ext = found_ep.get("container_extension", "mp4")
     episode_title_sanitized = sanitize_filename(title)
+    # 4. Zbuduj nazwę pliku odcinka: "Nazwa Serialu (Rok) - SXXEYY - Tytuł Odcinka.ext"
     file_name = f"{series_folder_name} - S{int(season):02d}E{int(episode_num):02d} - {episode_title_sanitized}.{ext}"
     file_path = os.path.join(path, file_name)
 
@@ -331,8 +375,9 @@ def download_episode():
     download_queue.put(job)
     download_status[episode_id] = "⏳"
     queue_data.append(job)
+
     save_queue()
-    return "", 202
+    return "🕐 Dodano odcinek do kolejki", 202
 
 # --- ZMODYFIKOWANA TRASA POBIERANIA SEZONU ---
 @seriale_bp.route("/download/season", methods=["POST"])
@@ -340,30 +385,47 @@ def download_season():
     series_id = request.form['series_id'].strip()
     season = int(request.form['season'])
 
-    response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
-    if response.status_code != 200:
-        return "Błąd pobierania danych serialu", 500
+    try:
+        response = requests.get(f"{BASE_API}&action=get_series_info&series_id={series_id}")
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.RequestException as e:
+        return f"Błąd komunikacji z API: {e}", 500
+    except ValueError:
+        return "Błąd: Nieprawidłowa odpowiedź JSON z API.", 500
 
-    data = response.json()
     series_info = data.get('info', {})
     episodes_raw = data.get('episodes', {})
 
-    # Logika tworzenia nazwy serialu z rokiem (raz dla całego sezonu)
+    # === LOGIKA NAZEWNICTWA PLEXA DLA FOLDERU SERIALU ===
+    # 1. Usuń prefiks "PL - " z nazwy serialu
     series_name_raw = series_info.get('name', f"serial_{series_id}")
+    series_name_cleaned = re.sub(r"^[pP][lL]\s*-\s*", "", series_name_raw).strip()
+
+    # 2. Wydobądź rok z 'releaseDate'
     release_date_str = series_info.get('releaseDate', '')
-    year = ''
+    year_str = ''
     if release_date_str:
         try:
-            year = f"({datetime.strptime(release_date_str, '%Y-%m-%d').year})"
+            year_str = f"({datetime.strptime(release_date_str, '%Y-%m-%d').year})"
         except ValueError:
             if release_date_str.strip()[:4].isdigit():
-                 year = f"({release_date_str.strip()[:4]})"
-    series_folder_name = sanitize_filename(f"{series_name_raw} {year}".strip())
+                 year_str = f"({release_date_str.strip()[:4]})"
+    
+    # 3. Zbuduj nazwę folderu serialu: "Nazwa Serialu (Rok)"
+    series_folder_name = sanitize_filename(f"{series_name_cleaned} {year_str}".strip())
+    # ====================================================
 
     if isinstance(episodes_raw, str):
-        episodes_raw = json.loads(episodes_raw)
+        try:
+            episodes_raw = json.loads(episodes_raw)
+        except json.JSONDecodeError:
+            return "Błąd: Nieprawidłowy format JSON odcinków z API.", 500
     
     episodes_in_season = [ep for sezon_lista in episodes_raw.values() for ep in sezon_lista if int(ep.get('season', 0)) == season]
+
+    if not episodes_in_season:
+        return f"Błąd: Nie znaleziono żadnych odcinków dla sezonu {season}.", 404
 
     for ep in episodes_in_season:
         episode_id = ep['id']
@@ -371,10 +433,18 @@ def download_season():
         episode_num = ep['episode_num']
         ext = ep.get("container_extension", "mp4")
 
-        # Tworzenie ścieżki i nazwy pliku dla każdego odcinka w sezonie
+        if not all([episode_id, episode_num, title, ext]):
+            print(f"Brak pełnych informacji dla odcinka: {ep}. Pomijam.")
+            continue
+
+        if episode_id in completed_data:
+            print(f"Odcinek {title} (ID: {episode_id}) już pobrany, pomijam.")
+            continue
+
         path = os.path.join(DOWNLOAD_PATH_SERIES, series_folder_name, f"Season {int(season):02d}")
         os.makedirs(path, exist_ok=True)
         episode_title_sanitized = sanitize_filename(title)
+        # 4. Zbuduj nazwę pliku odcinka: "Nazwa Serialu (Rok) - SXXEYY - Tytuł Odcinka.ext"
         file_name = f"{series_folder_name} - S{int(season):02d}E{int(episode_num):02d} - {episode_title_sanitized}.{ext}"
         file_path = os.path.join(path, file_name)
         
