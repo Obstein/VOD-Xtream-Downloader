@@ -31,6 +31,57 @@
         .nfo-btn { background-color: #007bff; }
         .download-btn:hover, .nfo-btn:hover { opacity: 0.9; }
         .back-link { display: block; text-align: center; margin-top: 20px; }
+        /* Dodaj do istniejącego bloku <style> */
+#download-queue-widget button {
+    border: none;
+    background-color: #dc3545; /* Kolor czerwony dla przycisku usuwania */
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 10px;
+    font-size: 0.8em;
+}
+
+#download-queue-widget button:hover {
+    background-color: #c82333;
+}
+
+#queue-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+#queue-list li:last-child {
+    border-bottom: none;
+}
+
+/* Dodatkowe style dla ukrywania/pokazywania widgetu */
+#toggle-queue-btn { /* Przycisk, który pokaże widget */
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #28a745; /* Zielony kolor */
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.5em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 999;
+}
+
+#toggle-queue-btn:hover {
+    background-color: #218838;
+}
     </style>
     <script>
         function downloadEpisode(episodeId, seriesId, season, episodeNum, title) {
@@ -106,6 +157,121 @@
             alert('Wystąpił błąd podczas pobierania pliku NFO: ' + error.message);
         });
         }
+
+        const queueWidget = document.getElementById('download-queue-widget');
+    const queueHeader = document.getElementById('queue-header');
+    const toggleQueueWidgetBtn = document.getElementById('toggle-queue-widget'); // Przycisk X
+    const toggleQueueBtn = document.getElementById('toggle-queue-btn'); // Pływający przycisk ↓
+    const queueList = document.getElementById('queue-list');
+
+    let isDragging = false;
+    let offsetX, offsetY;
+
+    // Funkcja do pobierania i aktualizowania kolejki
+    async function updateQueueWidget() {
+        try {
+            const response = await fetch('{{ url_for("seriale.queue_status") }}');
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            const statusData = await response.json();
+            
+            // Pobierz pełną listę zadań z kolejki_data, żeby mieć więcej detali
+            const fullQueueResponse = await fetch('{{ url_for("seriale.get_full_queue") }}'); // Będziemy musieli dodać ten endpoint
+            if (!fullQueueResponse.ok) {
+                throw new Error(`HTTP error! Status: ${fullQueueResponse.status}`);
+            }
+            const fullQueueData = await fullQueueResponse.json();
+
+            queueList.innerHTML = ''; // Wyczyść listę
+            if (fullQueueData.length === 0) {
+                queueList.innerHTML = '<p style="text-align: center; margin: 10px 0;">Kolejka jest pusta.</p>';
+            } else {
+                fullQueueData.forEach(job => {
+                    const listItem = document.createElement('li');
+                    // Pobierz status dla konkretnego episode_id
+                    const statusChar = statusData[job.episode_id] || '❓'; 
+                    listItem.innerHTML = `
+                        <span>${statusChar} ${job.file}</span>
+                        <button data-episode-id="${job.episode_id}">Usuń</button>
+                    `;
+                    queueList.appendChild(listItem);
+                });
+            }
+        } catch (error) {
+            console.error('Błąd podczas aktualizacji kolejki:', error);
+            queueList.innerHTML = '<p style="color: red; text-align: center;">Nie udało się załadować kolejki.</p>';
+        }
+    }
+
+    // Funkcja do usuwania elementu z kolejki
+    async function removeFromQueue(episodeId) {
+        try {
+            const response = await fetch('{{ url_for("seriale.queue_remove") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({ id: episodeId })
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            // Odśwież widżet po usunięciu
+            await updateQueueWidget();
+            alert('Element usunięty z kolejki.');
+        } catch (error) {
+            console.error('Błąd podczas usuwania z kolejki:', error);
+            alert('Wystąpił błąd podczas usuwania elementu z kolejki: ' + error.message);
+        }
+    }
+
+    // Delegacja zdarzeń dla przycisków "Usuń"
+    queueList.addEventListener('click', (event) => {
+        if (event.target.tagName === 'BUTTON' && event.target.hasAttribute('data-episode-id')) {
+            const episodeId = event.target.getAttribute('data-episode-id');
+            removeFromQueue(episodeId);
+        }
+    });
+
+    // Przycisk "X" do ukrywania widgetu
+    toggleQueueWidgetBtn.addEventListener('click', () => {
+        queueWidget.style.display = 'none';
+        toggleQueueBtn.style.display = 'flex'; // Pokaż pływający przycisk
+    });
+
+    // Pływający przycisk do pokazywania widgetu
+    toggleQueueBtn.addEventListener('click', () => {
+        queueWidget.style.display = 'flex';
+        toggleQueueBtn.style.display = 'none'; // Ukryj pływający przycisk
+        updateQueueWidget(); // Odśwież od razu po pokazaniu
+    });
+
+    // Funkcje do przeciągania widgetu
+    queueHeader.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        offsetX = e.clientX - queueWidget.getBoundingClientRect().left;
+        offsetY = e.clientY - queueWidget.getBoundingClientRect().top;
+        queueWidget.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        queueWidget.style.left = (e.clientX - offsetX) + 'px';
+        queueWidget.style.top = (e.clientY - offsetY) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        queueWidget.style.cursor = 'grab';
+    });
+
+    // Ustaw interwał odświeżania kolejki (np. co 5 sekund)
+    setInterval(updateQueueWidget, 5000); // Odświeżaj co 5 sekund
+    
+    // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
+    queueWidget.style.display = 'none';
+    toggleQueueBtn.style.display = 'flex';
     </script>
 </head>
 <body>
@@ -152,5 +318,54 @@
         <p style="text-align: center;"><a href="{{ url_for('seriale.queue_status') }}">Status kolejki</a></p>
         <p style="text-align: center;"><a href="{{ url_for('seriale.completed_episodes') }}">Pobrane odcinki</a></p>
     </div>
+    <div id="download-queue-widget" style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 300px;
+    max-height: 400px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    display: none; /* Domyślnie ukryte */
+    flex-direction: column;
+    overflow: hidden;
+">
+    <div style="
+        background-color: #007bff;
+        color: white;
+        padding: 10px 15px;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: move; /* Do przeciągania */
+    " id="queue-header">
+        <span>Kolejka pobierania</span>
+        <button id="toggle-queue-widget" style="
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 0 5px;
+        ">✕</button>
+    </div>
+    <div id="queue-content" style="
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 10px;
+        font-size: 0.9em;
+        color: #343a40;
+    ">
+        <p style="text-align: center; margin: 10px 0;">Ładowanie kolejki...</p>
+        <ul id="queue-list" style="list-style: none; padding: 0; margin: 0;">
+            </ul>
+    </div>
+</div>
+<button id="toggle-queue-btn">↓</button>
 </body>
 </html>

@@ -260,6 +260,12 @@ def queue_reorder():
 def completed_episodes():
     return jsonify(completed_data)
 
+# Nowy endpoint do pobierania pełnych danych kolejki (nazwy plików, ID, statusy itp.)
+@seriale_bp.route("/queue/full_data")
+def get_full_queue():
+    # Zwracamy pełną listę zadań w kolejce
+    return jsonify(queue_data)
+
 # --- Widoki i reszta tras (zmiana w seriale_list) ---
 @seriale_bp.route("/")
 def seriale_list():
