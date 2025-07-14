@@ -214,8 +214,7 @@ def download_movie():
     path = os.path.join(DOWNLOAD_PATH_MOVIES, movie_folder_name)
     os.makedirs(path, exist_ok=True) # Utwórz folder dla filmu
 
-    # Zakładamy rozszerzenie mp4, możesz to dostosować, jeśli API podaje inne.
-    ext = "mp4" 
+    
     # Nazwa pliku to nazwa folderu + rozszerzenie dla Plexa
     file_name = f"{movie_folder_name}.{ext}"
     file_path = os.path.join(path, file_name)
