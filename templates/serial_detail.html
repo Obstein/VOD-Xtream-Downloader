@@ -272,7 +272,7 @@
         queueWidget.style.display = 'none';
         toggleQueueBtn.style.display = 'flex';
 
-        function updateFavoriteButton(button, isFavorite) {
+         function updateFavoriteButton(button, isFavorite) {
             if (isFavorite) {
                 button.style.color = 'gold'; // Złota gwiazdka dla ulubionych
                 button.textContent = '★';
@@ -305,7 +305,9 @@
                     .catch(error => console.error('Błąd zmiany ulubionych:', error));
             });
         });
-    }); // ZAKOŃCZENIE OWIJANIA
+
+        });
+    // ZAKOŃCZENIE OWIJANIA
     
     // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
     queueWidget.style.display = 'none';
