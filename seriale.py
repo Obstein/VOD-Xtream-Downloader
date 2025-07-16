@@ -31,6 +31,7 @@ DOWNLOAD_PATH_SERIES = os.getenv("DOWNLOAD_PATH_SERIES", "/downloads/Seriale")
 RETRY_COUNT = int(os.getenv("RETRY_COUNT", 3)) # Już nie używane bezpośrednio, ale zostawiamy dla spójności
 TMDB_API_KEY = "cfdfac787bf2a6e2c521b93a0309ff2c"
 BASE_API = f"{XTREAM_HOST}:{XTREAM_PORT}/player_api.php?username={XTREAM_USERNAME}&password={XTREAM_PASSWORD}"
+FAVORITES_FILE = "favorites.json"
 
 # --- Funkcja pomocnicza sanitize_filename ---
 def sanitize_filename(name):
@@ -38,6 +39,37 @@ def sanitize_filename(name):
     s = re.sub(r'[^\w\s\-\._()]', '', name)
     s = re.sub(r'\s+', ' ', s).strip()
     return s
+
+
+
+def load_favorites():
+    if os.path.exists(FAVORITES_FILE):
+        with open(FAVORITES_FILE, 'r') as f:
+            return json.load(f)
+    return []
+
+def save_favorites(favorites):
+    with open(FAVORITES_FILE, 'w') as f:
+        json.dump(favorites, f, indent=4)
+
+@seriale_bp.route('/favorites/toggle/<int:series_id>', methods=['POST'])
+def toggle_favorite(series_id):
+    favorites = load_favorites()
+    if series_id in favorites:
+        favorites.remove(series_id)
+        message = "Serial usunięty z ulubionych."
+    else:
+        favorites.append(series_id)
+        message = "Serial dodany do ulubionych!"
+    save_favorites(favorites)
+    return jsonify({"status": "success", "message": message, "is_favorite": series_id in favorites})
+
+# Opcjonalnie: trasa do sprawdzenia, czy dany serial jest ulubiony
+@seriale_bp.route('/favorites/status/<int:series_id>', methods=['GET'])
+def get_favorite_status(series_id):
+    favorites = load_favorites()
+    is_favorite = series_id in favorites
+    return jsonify({"is_favorite": is_favorite})
 
 # --- Funkcje TMDB (bez zmian) ---
 from functools import lru_cache

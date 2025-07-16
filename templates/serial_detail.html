@@ -276,11 +276,52 @@
     // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
     queueWidget.style.display = 'none';
     toggleQueueBtn.style.display = 'flex';
+
+     document.addEventListener('DOMContentLoaded', function() {
+        // Funkcja do aktualizacji stanu gwiazdki
+        function updateFavoriteButton(button, isFavorite) {
+            if (isFavorite) {
+                button.style.color = 'gold'; // Złota gwiazdka dla ulubionych
+                button.textContent = '★';
+            } else {
+                button.style.color = 'gray'; // Szara gwiazdka dla nieulubionych
+                button.textContent = '☆';
+            }
+        }
+
+        // Obsługa kliknięcia na przycisk ulubionych
+        document.querySelectorAll('.favorite-toggle-btn').forEach(button => {
+            const seriesId = button.dataset.seriesId;
+
+            // Sprawdź początkowy stan
+            fetch(`/seriale/favorites/status/${seriesId}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateFavoriteButton(button, data.is_favorite);
+                });
+
+            // Dodaj nasłuchiwacz kliknięć
+            button.addEventListener('click', function() {
+                fetch(`/seriale/favorites/toggle/${seriesId}`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        updateFavoriteButton(button, data.is_favorite);
+                        alert(data.message); // Opcjonalnie: pokaż powiadomienie
+                    })
+                    .catch(error => console.error('Błąd zmiany ulubionych:', error));
+            });
+        });
+    });
     </script>
 </head>
 <body>
     <div class="container">
-        <h1>{{ serial.info.name }}</h1>
+        <h1>{{ serial.info.name }} <button class="favorite-toggle-btn"
+            data-series-id="{{ serial.info.series_id }}"
+            id="fav-btn-{{ serial.info.series_id }}"
+            style="background: none; border: none; cursor: pointer; font-size: 1.5em; color: gray; margin-left: 10px;">
+        ☆
+    </button></h1>
         {% if serial.info.cover %}
             <p><img src="{{ serial.info.cover }}" alt="{{ serial.info.name }} cover" style="max-width: 200px; display: block; margin: 0 auto;"></p>
         {% endif %}

@@ -205,6 +205,42 @@
     // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
     queueWidget.style.display = 'none';
     toggleQueueBtn.style.display = 'flex';
+
+     document.addEventListener('DOMContentLoaded', function() {
+        // Funkcja do aktualizacji stanu gwiazdki
+        function updateFavoriteButton(button, isFavorite) {
+            if (isFavorite) {
+                button.style.color = 'gold'; // Złota gwiazdka dla ulubionych
+                button.textContent = '★';
+            } else {
+                button.style.color = 'gray'; // Szara gwiazdka dla nieulubionych
+                button.textContent = '☆';
+            }
+        }
+
+        // Obsługa kliknięcia na przycisk ulubionych
+        document.querySelectorAll('.favorite-toggle-btn').forEach(button => {
+            const seriesId = button.dataset.seriesId;
+
+            // Sprawdź początkowy stan
+            fetch(`/seriale/favorites/status/${seriesId}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateFavoriteButton(button, data.is_favorite);
+                });
+
+            // Dodaj nasłuchiwacz kliknięć
+            button.addEventListener('click', function() {
+                fetch(`/seriale/favorites/toggle/${seriesId}`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        updateFavoriteButton(button, data.is_favorite);
+                        alert(data.message); // Opcjonalnie: pokaż powiadomienie
+                    })
+                    .catch(error => console.error('Błąd zmiany ulubionych:', error));
+            });
+        });
+    });
     </script>
 </head>
 <body>
@@ -224,10 +260,16 @@
         <div class="series-grid">
             {% for serial in seriale %}
             <div class="series-item">
+            
                 {% if serial.cover %}
                     <img src="{{ serial.cover }}" alt="{{ serial.name }} cover">
                 {% endif %}
                 <h2><a href="{{ url_for('seriale.serial_detail', series_id=serial.series_id) }}">{{ serial.name }}</a></h2>
+                <button class="favorite-toggle-btn"
+            data-series-id="{{ serial.series_id }}"
+            id="fav-btn-{{ serial.series_id }}"
+            style="background: none; border: none; cursor: pointer; font-size: 1.5em; color: gray;">
+        ☆ </button>
             </div>
             {% endfor %}
             {% if not seriale %}
