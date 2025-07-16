@@ -234,6 +234,21 @@
                     .catch(error => console.error('Błąd zmiany ulubionych:', error));
             });
         });
+         function checkForNewEpisodes() {
+            showMessage('Rozpoczynam sprawdzanie nowych odcinków...', 'info'); // Pokaż wiadomość od razu
+            fetch('/seriale/check_new_episodes_manual', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                showMessage(data.message, 'success'); // Pokaż wiadomość z serwera
+            })
+            .catch(error => {
+                console.error('Błąd:', error);
+                showMessage('Wystąpił błąd podczas uruchamiania sprawdzania nowości.', 'error');
+            });
+        }
     }); // ZAKOŃCZENIE OWIJANIA
     
     // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
@@ -250,6 +265,7 @@
         <nav style="text-align: center; margin-bottom: 20px;">
             <a href="{{ url_for('seriale.seriale_list') }}" style="margin-right: 20px; font-weight: bold; text-decoration: none; color: #007bff;">Seriale</a>
             <a href="{{ url_for('filmy.filmy_list') }}" style="font-weight: bold; text-decoration: underline; color: #007bff;">Filmy</a>
+            <button onclick="checkForNewEpisodes()">Sprawdź nowości</button>
         </nav>
 
         <form class="search-form" action="{{ url_for('seriale.seriale_list') }}" method="get">
@@ -328,5 +344,6 @@
     </div>
 </div>
 <button id="toggle-queue-btn">↓</button>
+
 </body>
 </html>

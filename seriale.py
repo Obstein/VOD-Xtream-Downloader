@@ -8,7 +8,11 @@ from urllib.parse import quote
 import json
 import sys
 import re
+import threading 
+import time
 from datetime import datetime
+
+from episode_monitor import monitor_new_episodes 
 
 # Importuj wspólne komponenty z nowo utworzonego pliku
 from downloader_core import (
@@ -40,7 +44,15 @@ def sanitize_filename(name):
     s = re.sub(r'\s+', ' ', s).strip()
     return s
 
-
+@seriale_bp.route("/check_new_episodes_manual", methods=["POST"])
+def check_new_episodes_manual():
+    # Uruchom funkcję monitor_new_episodes w osobnym wątku
+    # To zapobiegnie blokowaniu żądania HTTP, podczas gdy skrypt działa
+    thread = threading.Thread(target=monitor_new_episodes)
+    thread.daemon = True # Ustaw wątek jako daemon, aby zakończył się z głównym programem
+    thread.start()
+    
+    return jsonify({"message": "Rozpoczęto sprawdzanie nowych odcinków w tle. Powiadomienia pojawią się na Discordzie."}), 202 # 202 Accepted
 
 def load_favorites():
     """Ładuje ulubione seriale z pliku JSON. Zwraca pustą listę, jeśli plik nie istnieje lub jest pusty/uszkodzony."""
