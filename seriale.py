@@ -43,14 +43,31 @@ def sanitize_filename(name):
 
 
 def load_favorites():
-    if os.path.exists(FAVORITES_FILE):
-        with open(FAVORITES_FILE, 'r') as f:
-            return json.load(f)
-    return []
+    """Ładuje ulubione seriale z pliku JSON. Zwraca pusty słownik, jeśli plik nie istnieje lub jest pusty/uszkodzony."""
+    if not os.path.exists(FAVORITES_FILE):
+        return {}
+    try:
+        with open(FAVORITES_FILE, 'r', encoding='utf-8') as f:
+            # Sprawdź, czy plik nie jest pusty przed próbą ładowania JSON
+            content = f.read().strip()
+            if not content:
+                return {} # Plik jest pusty
+            return json.loads(content) # Ładuj zawartość jako JSON
+    except json.JSONDecodeError:
+        print(f"Ostrzeżenie: Plik {FAVORITES_FILE} jest uszkodzony lub zawiera niepoprawny JSON. Zwracam pusty słownik.")
+        return {}
+    except Exception as e:
+        print(f"Błąd podczas ładowania ulubionych z pliku {FAVORITES_FILE}: {e}")
+        return {}
 
 def save_favorites(favorites):
-    with open(FAVORITES_FILE, 'w') as f:
-        json.dump(favorites, f, indent=4)
+    """Zapisuje ulubione seriale do pliku JSON."""
+    try:
+        with open(FAVORITES_FILE, 'w', encoding='utf-8') as f:
+            json.dump(favorites, f, indent=4)
+    except Exception as e:
+        print(f"Błąd podczas zapisywania ulubionych do pliku {FAVORITES_FILE}: {e}")
+
 
 @seriale_bp.route('/favorites/toggle/<int:series_id>', methods=['POST'])
 def toggle_favorite(series_id):
