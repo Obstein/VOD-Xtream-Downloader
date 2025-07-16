@@ -234,21 +234,31 @@
                     .catch(error => console.error('Błąd zmiany ulubionych:', error));
             });
         });
-         function checkForNewEpisodes() {
-            showMessage('Rozpoczynam sprawdzanie nowych odcinków...', 'info'); // Pokaż wiadomość od razu
-            fetch('/seriale/check_new_episodes_manual', {
+
+        function checkForNewEpisodes() {
+            showMessage('Rozpoczynam sprawdzanie nowych odcinków...', 'info'); 
+            fetch('/seriale/webhook/check_new_episodes', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-API-Key': WEBHOOK_API_KEY // Przekaż klucz API w nagłówku
+                }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (response.status === 401) {
+                    throw new Error("Nieautoryzowany dostęp. Sprawdź klucz API.");
+                }
+                return response.json();
+            })
             .then(data => {
-                showMessage(data.message, 'success'); // Pokaż wiadomość z serwera
+                showMessage(data.message, 'success'); 
             })
             .catch(error => {
                 console.error('Błąd:', error);
-                showMessage('Wystąpił błąd podczas uruchamiania sprawdzania nowości.', 'error');
+                showMessage(`Błąd podczas uruchamiania sprawdzania nowości: ${error.message}`, 'error');
             });
         }
+         
     }); // ZAKOŃCZENIE OWIJANIA
     
     // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny

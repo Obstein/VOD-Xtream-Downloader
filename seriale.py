@@ -36,6 +36,7 @@ RETRY_COUNT = int(os.getenv("RETRY_COUNT", 3)) # Już nie używane bezpośrednio
 TMDB_API_KEY = "cfdfac787bf2a6e2c521b93a0309ff2c"
 BASE_API = f"{XTREAM_HOST}:{XTREAM_PORT}/player_api.php?username={XTREAM_USERNAME}&password={XTREAM_PASSWORD}"
 FAVORITES_FILE = "favorites.json"
+MONITORED_STATE_FILE = "monitored_series_state.json"
 
 # --- Funkcja pomocnicza sanitize_filename ---
 def sanitize_filename(name):
@@ -53,6 +54,29 @@ def check_new_episodes_manual():
     thread.start()
     
     return jsonify({"message": "Rozpoczęto sprawdzanie nowych odcinków w tle. Powiadomienia pojawią się na Discordzie."}), 202 # 202 Accepted
+
+@seriale_bp.route("/webhook/check_new_episodes", methods=["POST"])
+def check_new_episodes_webhook():
+    # Sprawdź klucz API w nagłówku "X-API-Key"
+    provided_api_key = request.headers.get('X-API-Key')
+    
+    if not WEBHOOK_API_KEY:
+        print("Błąd konfiguracji: WEBHOOK_API_KEY nie jest ustawiony w zmiennych środowiskowych.")
+        return jsonify({"message": "Webhook API Key not configured on server."}), 500
+
+    if provided_api_key != WEBHOOK_API_KEY:
+        print(f"Nieautoryzowane żądanie do webhooka. Próba użycia klucza: {provided_api_key}")
+        abort(401) # Nieautoryzowany dostęp
+    
+    # Uruchom funkcję monitor_new_episodes w osobnym wątku
+    # To zapobiegnie blokowaniu żądania HTTP, podczas gdy skrypt działa
+    thread = threading.Thread(target=monitor_new_episodes)
+    thread.daemon = True # Ustaw wątek jako daemon, aby zakończył się z głównym programem
+    thread.start()
+    
+    print("Rozpoczęto sprawdzanie nowych odcinków za pośrednictwem webhooka.")
+    return jsonify({"message": "Rozpoczęto sprawdzanie nowych odcinków w tle. Powiadomienia pojawią się na Discordzie."}), 202 # 202 Accepted
+
 
 def load_favorites():
     """Ładuje ulubione seriale z pliku JSON. Zwraca pustą listę, jeśli plik nie istnieje lub jest pusty/uszkodzony."""
