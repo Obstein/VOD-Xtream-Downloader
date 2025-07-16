@@ -318,9 +318,11 @@
 </head>
 <body>
     <div class="container">
-        <h1>{{ serial.info.name }} {{ serial.info.id }} {{ series_id }}<button class="favorite-toggle-btn"
-        data-series-id="{{ serial.info.id }}" id="fav-btn-{{ series_id }}"
-        style="...">
+        <h1>{{ serial.info.name }}<button class="favorite-toggle-btn"
+            data-series-id="{{ series_id }}"
+            id="fav-btn-{{ series_id }}"
+            style="background: none; border: none; cursor: pointer; font-size: 1.5em; color: gray;">
+        ☆ </button>
     ☆
 </button></h1>
         {% if serial.info.cover %}
