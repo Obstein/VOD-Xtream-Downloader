@@ -200,13 +200,8 @@
         // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
         queueWidget.style.display = 'none';
         toggleQueueBtn.style.display = 'flex';
-    }); // ZAKOŃCZENIE OWIJANIA
-    
-    // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
-    queueWidget.style.display = 'none';
-    toggleQueueBtn.style.display = 'flex';
 
-     document.addEventListener('DOMContentLoaded', function() {
+         // --- Kod JS dla PRZYCISKÓW ULUBIONYCH (który już masz) ---
         // Funkcja do aktualizacji stanu gwiazdki
         function updateFavoriteButton(button, isFavorite) {
             if (isFavorite) {
@@ -227,7 +222,8 @@
                 .then(response => response.json())
                 .then(data => {
                     updateFavoriteButton(button, data.is_favorite);
-                });
+                })
+                .catch(error => console.error('Błąd pobierania statusu ulubionych:', error));
 
             // Dodaj nasłuchiwacz kliknięć
             button.addEventListener('click', function() {
@@ -235,12 +231,18 @@
                     .then(response => response.json())
                     .then(data => {
                         updateFavoriteButton(button, data.is_favorite);
-                        alert(data.message); // Opcjonalnie: pokaż powiadomienie
+                        alert(data.message);
                     })
                     .catch(error => console.error('Błąd zmiany ulubionych:', error));
             });
         });
-    });
+    }); // ZAKOŃCZENIE OWIJANIA
+    
+    // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
+    queueWidget.style.display = 'none';
+    toggleQueueBtn.style.display = 'flex';
+
+    
     </script>
 </head>
 <body>

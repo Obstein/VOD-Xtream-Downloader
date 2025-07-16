@@ -271,13 +271,8 @@
         // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
         queueWidget.style.display = 'none';
         toggleQueueBtn.style.display = 'flex';
-    }); // ZAKOŃCZENIE OWIJANIA
-    
-    // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
-    queueWidget.style.display = 'none';
-    toggleQueueBtn.style.display = 'flex';
 
- // --- Kod JS dla PRZYCISKÓW ULUBIONYCH (który już masz) ---
+         // --- Kod JS dla PRZYCISKÓW ULUBIONYCH (który już masz) ---
         // Funkcja do aktualizacji stanu gwiazdki
         function updateFavoriteButton(button, isFavorite) {
             if (isFavorite) {
@@ -311,7 +306,14 @@
                     })
                     .catch(error => console.error('Błąd zmiany ulubionych:', error));
             });
-        });    
+        });
+    }); // ZAKOŃCZENIE OWIJANIA
+    
+    // Upewnij się, że widget jest początkowo ukryty i przycisk widoczny
+    queueWidget.style.display = 'none';
+    toggleQueueBtn.style.display = 'flex';
+
+    
     </script>
 </head>
 <body>
