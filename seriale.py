@@ -85,7 +85,8 @@ def download_nfo(series_id, season, episode):
     series_info = info.get('info', {})
     series_name_raw = series_info.get('name', f"serial_{series_id}")
 
-    series_name_cleaned = re.sub(r"^[pP][lL]\s*-\s*", "", series_name_raw).strip()
+    prefix_pattern = r"^(?:[pP][lL]|[eE][nN]|[aA]\+|[dD]\+)\s*-\s*"
+    series_name_cleaned = re.sub(prefix_pattern, "", series_name_raw).strip()
     
     release_date_str = series_info.get('releaseDate', '')
     year_str = ''
@@ -263,7 +264,8 @@ def download_episode():
     ext = current_episode_info.get("container_extension", "mp4") # Domyślne rozszerzenie
     
     series_name_raw = series_info.get("name", "")
-    series_name_cleaned = re.sub(r"^[pP][lL]\s*-\s*", "", series_name_raw).strip()
+    prefix_pattern = r"^(?:[pP][lL]|[eE][nN]|[aA]\+|[dD]\+)\s*-\s*"
+    series_name_cleaned = re.sub(prefix_pattern, "", series_name_raw).strip()
 
     release_year_str = series_info.get("releaseDate", "").split('-')[0] if series_info.get("releaseDate") else ""
 

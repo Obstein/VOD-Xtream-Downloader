@@ -83,7 +83,8 @@ def download_movie_nfo(movie_id):
     movie_name_raw = movie_info.get('name', f"film_{movie_id}")
     
     # === LOGIKA NAZEWNICTWA PLEXA DLA FILMU ===
-    movie_name_cleaned = re.sub(r"^[pP][lL]\s*-\s*", "", movie_name_raw).strip()
+    prefix_pattern = r"^(?:[pP][lL]|[eE][nN]|[aA]\+|[dD]\+)\s*-\s*"
+    movie_name_cleaned = re.sub(prefix_pattern, "", movie_name_raw).strip()
     
     release_date_str = movie_info.get('releaseDate', '') # Dla filmów to 'releasedate' (API v2) lub 'added' (API v1)
     year_str = ''
@@ -195,7 +196,8 @@ def download_movie():
         return "Błąd: Brak wymaganych danych do pobrania filmu.", 400
 
     # === LOGIKA NAZEWNICTWA PLEXA DLA FILMU ===
-    movie_name_cleaned = re.sub(r"^[pP][lL]\s*-\s*", "", name_raw).strip()
+    prefix_pattern = r"^(?:[pP][lL]|[eE][nN]|[aA]\+|[dD]\+)\s*-\s*"
+    movie_name_cleaned = re.sub(prefix_pattern, "", name_raw).strip()
     
     # Spróbuj pobrać rok z TMDB dla dokładniejszej nazwy folderu
     tmdb_id = search_tmdb_movie_id(movie_name_cleaned)
